@@ -365,20 +365,6 @@ export default {
         // Save registration data
         saveToLocalStorage('registrations', existingRegistrations)
         saveToLocalStorage('latestRegistration', registrationData)
-        
-        // Save user preferences
-        saveToLocalStorage('userPreferences', {
-          language: registration.language,
-          interestedPrograms: registration.interestedPrograms,
-          lastRegistration: new Date().toISOString()
-        })
-
-        // Save search and filter history
-        saveToLocalStorage('searchHistory', {
-          lastSearchQuery: searchQuery.value,
-          lastSelectedCategory: selectedCategory.value,
-          lastSelectedPrice: selectedPrice.value
-        })
 
         // Update participant counts for selected programs
         registration.interestedPrograms.forEach(programName => {
@@ -486,16 +472,6 @@ export default {
     onMounted(() => {
       updateStats()
       loadUserData()
-      
-      // Real-time update participant data
-      setInterval(() => {
-        allPrograms.value.forEach(program => {
-          if (Math.random() > 0.7) {
-            program.participants += Math.floor(Math.random() * 3)
-          }
-        })
-        updateStats()
-      }, 30000)
     })
 
     return {

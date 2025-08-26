@@ -320,13 +320,6 @@
           // Save registration data
           saveToLocalStorage('registrations', existingRegistrations)
           saveToLocalStorage('latestRegistration', registrationData)
-          
-          // Save user preferences
-          saveToLocalStorage('userPreferences', {
-            language: registration.language,
-            interestedPrograms: registration.interestedPrograms,
-            lastRegistration: new Date().toISOString()
-          })
 
           // Update participant counts for selected programs
           registration.interestedPrograms.forEach(programName => {
