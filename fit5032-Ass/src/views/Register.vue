@@ -20,7 +20,11 @@
                         v-model="registration.firstName"
                         :class="getValidationClass('firstName')"
                         @blur="validateField('firstName')"
+                        placeholder="Enter your first name"
                       >
+                      <div class="form-text text-muted">
+                        <i class="fas fa-info-circle"></i> Must be at least 2 characters long
+                      </div>
                       <div v-if="errors.firstName" class="validation-error">{{ errors.firstName }}</div>
                     </div>
                   </div>
@@ -33,7 +37,11 @@
                         v-model="registration.lastName"
                         :class="getValidationClass('lastName')"
                         @blur="validateField('lastName')"
+                        placeholder="Enter your last name"
                       >
+                      <div class="form-text text-muted">
+                        <i class="fas fa-info-circle"></i> Must be at least 2 characters long
+                      </div>
                       <div v-if="errors.lastName" class="validation-error">{{ errors.lastName }}</div>
                     </div>
                   </div>
@@ -47,7 +55,11 @@
                     v-model="registration.email"
                     :class="getValidationClass('email')"
                     @blur="validateField('email')"
+                    placeholder="Enter your email address"
                   >
+                  <div class="form-text text-muted">
+                    <i class="fas fa-info-circle"></i> Please enter a valid email address (e.g., user@example.com)
+                  </div>
                   <div v-if="errors.email" class="validation-error">{{ errors.email }}</div>
                   <div v-if="registration.email && !errors.email" class="validation-success">
                     <i class="fas fa-check"></i> Valid email format
@@ -64,9 +76,49 @@
                     @blur="validateField('phone')"
                     placeholder="04XX XXX XXX"
                   >
+                  <div class="form-text text-muted">
+                    <i class="fas fa-info-circle"></i> Please enter a valid Australian mobile number (04XX XXX XXX)
+                  </div>
                   <div v-if="errors.phone" class="validation-error">{{ errors.phone }}</div>
                   <div v-if="registration.phone && !errors.phone" class="validation-success">
                     <i class="fas fa-check"></i> Valid Australian mobile number
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label">Password *</label>
+                      <input 
+                        type="password" 
+                        class="form-control" 
+                        v-model="registration.password"
+                        :class="getValidationClass('password')"
+                        @blur="validateField('password')"
+                        placeholder="Create a password"
+                      >
+                      <div class="form-text text-muted">
+                        <i class="fas fa-info-circle"></i> Must be at least 8 characters with letters and numbers
+                      </div>
+                      <div v-if="errors.password" class="validation-error">{{ errors.password }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mb-3">
+                      <label class="form-label">Confirm Password *</label>
+                      <input 
+                        type="password" 
+                        class="form-control" 
+                        v-model="registration.confirmPassword"
+                        :class="getValidationClass('confirmPassword')"
+                        @blur="validateField('confirmPassword')"
+                        placeholder="Confirm your password"
+                      >
+                      <div class="form-text text-muted">
+                        <i class="fas fa-info-circle"></i> Must match your password
+                      </div>
+                      <div v-if="errors.confirmPassword" class="validation-error">{{ errors.confirmPassword }}</div>
+                    </div>
                   </div>
                 </div>
   
@@ -82,7 +134,11 @@
                         @blur="validateField('age')"
                         min="16"
                         max="99"
+                        placeholder="Enter your age"
                       >
+                      <div class="form-text text-muted">
+                        <i class="fas fa-info-circle"></i> Age must be between 16 and 99
+                      </div>
                       <div v-if="errors.age" class="validation-error">{{ errors.age }}</div>
                     </div>
                   </div>
@@ -129,7 +185,11 @@
                     v-model="registration.emergencyContact"
                     :class="getValidationClass('emergencyContact')"
                     @blur="validateField('emergencyContact')"
+                    placeholder="Enter emergency contact name"
                   >
+                  <div class="form-text text-muted">
+                    <i class="fas fa-info-circle"></i> Must be at least 2 characters long
+                  </div>
                   <div v-if="errors.emergencyContact" class="validation-error">{{ errors.emergencyContact }}</div>
                 </div>
   
@@ -143,6 +203,9 @@
                     @blur="validateField('emergencyPhone')"
                     placeholder="04XX XXX XXX"
                   >
+                  <div class="form-text text-muted">
+                    <i class="fas fa-info-circle"></i> Please enter a valid Australian mobile number (04XX XXX XXX)
+                  </div>
                   <div v-if="errors.emergencyPhone" class="validation-error">{{ errors.emergencyPhone }}</div>
                 </div>
   
@@ -187,6 +250,16 @@
                 <strong>Registration Successful!</strong> Welcome to our community. 
                 You'll receive a confirmation email shortly.
               </div>
+
+              <!-- Login Link -->
+              <div class="text-center mt-4">
+                <p class="text-muted">
+                  Already have an account? 
+                  <router-link to="/login" class="text-primary text-decoration-none">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                  </router-link>
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -197,7 +270,7 @@
   <script>
   import { ref, reactive } from 'vue'
   import { programsData } from '../data/programs.js'
-  import { validateEmail, validatePhone, validateName, validateAge } from '../utils/validation.js'
+  import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
   
   export default {
     name: 'Register',
@@ -212,6 +285,8 @@
         lastName: '',
         email: '',
         phone: '',
+        password: '',
+        confirmPassword: '',
         age: '',
         language: 'English',
         interestedPrograms: [],
@@ -225,13 +300,15 @@
         lastName: '',
         email: '',
         phone: '',
+        password: '',
+        confirmPassword: '',
         age: '',
         emergencyContact: '',
         emergencyPhone: '',
         agreeTerms: ''
       })
   
-      // BR (B.1): Two different types of validation
+            // BR (B.1): Two different types of validation
       const validateField = (fieldName) => {
         switch (fieldName) {
           case 'firstName':
@@ -239,20 +316,28 @@
           case 'emergencyContact':
             errors[fieldName] = validateName(registration[fieldName])
             break
-  
+
           case 'email':
             errors.email = validateEmail(registration.email)
             break
-  
+
           case 'phone':
           case 'emergencyPhone':
             errors[fieldName] = validatePhone(registration[fieldName])
             break
-  
+
+          case 'password':
+            errors.password = validatePassword(registration.password)
+            break
+
+          case 'confirmPassword':
+            errors.confirmPassword = validateConfirmPassword(registration.confirmPassword, registration.password)
+            break
+
           case 'age':
             errors.age = validateAge(registration.age)
             break
-  
+
           case 'agreeTerms':
             errors.agreeTerms = registration.agreeTerms ? '' : 'You must agree to the terms and conditions'
             break
@@ -265,12 +350,12 @@
         return ''
       }
   
-      const validateForm = () => {
+            const validateForm = () => {
         const fieldsToValidate = [
-          'firstName', 'lastName', 'email', 'phone', 'age',
+          'firstName', 'lastName', 'email', 'phone', 'password', 'confirmPassword', 'age',
           'emergencyContact', 'emergencyPhone', 'agreeTerms'
         ]
-  
+
         fieldsToValidate.forEach(field => validateField(field))
         return fieldsToValidate.every(field => !errors[field])
       }

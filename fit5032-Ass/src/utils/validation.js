@@ -69,5 +69,28 @@ export const validationRules = {
   }
   
   export const validateAge = (age) => {
-    return validateField(parseInt(age), validationRules.age)
+  return validateField(parseInt(age), validationRules.age)
+}
+
+export const validatePassword = (password) => {
+  if (!password) {
+    return 'Password is required'
   }
+  if (password.length < 8) {
+    return 'Password must be at least 8 characters long'
+  }
+  if (!/(?=.*[A-Za-z])(?=.*\d)/.test(password)) {
+    return 'Password must contain both letters and numbers'
+  }
+  return ''
+}
+
+export const validateConfirmPassword = (confirmPassword, password) => {
+  if (!confirmPassword) {
+    return 'Please confirm your password'
+  }
+  if (confirmPassword !== password) {
+    return 'Passwords do not match'
+  }
+  return ''
+}
