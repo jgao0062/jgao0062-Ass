@@ -46,22 +46,8 @@
         stats.value.participants = programsData.reduce((total, program) => total + program.participants, 0)
       }
   
-      // Simulate real-time updates
-      const startRealTimeUpdates = () => {
-        setInterval(() => {
-          // Randomly update participant numbers
-          programsData.forEach(program => {
-            if (Math.random() > 0.8) { // 20% chance to update
-              program.participants += Math.floor(Math.random() * 2)
-            }
-          })
-          updateStats()
-        }, 30000) // Update every 30 seconds
-      }
-  
       onMounted(() => {
         updateStats()
-        startRealTimeUpdates()
       })
   
       return {
