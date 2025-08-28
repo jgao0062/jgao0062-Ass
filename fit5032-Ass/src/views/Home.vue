@@ -59,7 +59,9 @@
     setup() {
       // BR (B.2): Dynamic Data - Featured programs from data structure
       const featuredPrograms = computed(() => {
-        return programsData.slice(0, 3)
+        return [...programsData]
+          .sort((a, b) => b.participants - a.participants)
+          .slice(0, 3)
       })
   
       return {
