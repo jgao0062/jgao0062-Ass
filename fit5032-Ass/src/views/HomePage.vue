@@ -7,7 +7,7 @@
             <div class="col-lg-8">
               <h1 class="display-4 fw-bold mb-4">Get Healthy Through Community Sports</h1>
               <p class="lead mb-4">
-                Join Melbourne's most inclusive sports community. Free and affordable programs for everyone, 
+                Join Melbourne's most inclusive sports community. Free and affordable programs for everyone,
                 regardless of background or fitness level.
               </p>
               <router-link to="/programs" class="btn btn-success btn-lg me-3">
@@ -23,17 +23,17 @@
           </div>
         </div>
       </section>
-  
+
       <!-- Stats Section -->
       <StatsSection />
-  
+
       <!-- Featured Programs -->
       <section class="py-5">
         <div class="container">
           <h2 class="text-center mb-5">Featured Programs</h2>
           <div class="row">
-            <ProgramCard 
-              v-for="program in featuredPrograms" 
+            <ProgramCard
+              v-for="program in featuredPrograms"
               :key="program.id"
               :program="program"
               button-text="Learn More"
@@ -43,15 +43,15 @@
       </section>
     </div>
   </template>
-  
+
   <script>
   import { computed } from 'vue'
   import StatsSection from '../components/StatsSection.vue'
   import ProgramCard from '../components/ProgramCard.vue'
   import { programsData } from '../data/programs.js'
-  
+
   export default {
-    name: 'Home',
+    name: 'HomePage',
     components: {
       StatsSection,
       ProgramCard
@@ -63,7 +63,7 @@
           .sort((a, b) => b.participants - a.participants)
           .slice(0, 3)
       })
-  
+
       return {
         featuredPrograms
       }

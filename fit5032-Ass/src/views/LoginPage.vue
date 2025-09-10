@@ -37,7 +37,7 @@ import { ref } from 'vue'
 import { login } from '../utils/auth.js'
 
 export default {
-  name: 'Login',
+  name: 'LoginPage',
   setup() {
     const email = ref('')
     const password = ref('')

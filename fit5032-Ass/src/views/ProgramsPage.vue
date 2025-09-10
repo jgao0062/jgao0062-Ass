@@ -1,16 +1,16 @@
 <template>
     <div class="container py-5">
       <h2 class="text-center mb-5">All Sports Programs</h2>
-      
+
       <!-- Filter Section -->
       <div class="program-filter">
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">Search Programs</label>
-            <input 
-              type="text" 
-              class="form-control" 
-              v-model="searchQuery" 
+            <input
+              type="text"
+              class="form-control"
+              v-model="searchQuery"
               placeholder="Search by name or type..."
             >
           </div>
@@ -36,23 +36,23 @@
           </div>
         </div>
       </div>
-  
+
       <!-- Programs Grid -->
       <div class="row" v-if="!isLoading">
-        <ProgramCard 
-          v-for="program in filteredPrograms" 
+        <ProgramCard
+          v-for="program in filteredPrograms"
           :key="program.id"
           :program="program"
           button-text="Join Program"
         />
       </div>
-  
+
       <!-- Loading State -->
       <div v-if="isLoading" class="text-center py-5">
         <div class="loading-spinner"></div>
         <p class="mt-3">Loading programs...</p>
       </div>
-  
+
       <!-- No Results -->
       <div v-if="!isLoading && filteredPrograms.length === 0" class="text-center py-5">
         <i class="fas fa-search fa-3x text-muted mb-3"></i>
@@ -61,14 +61,14 @@
       </div>
     </div>
   </template>
-  
+
   <script>
   import { ref, computed, onMounted } from 'vue'
   import ProgramCard from '../components/ProgramCard.vue'
   import { programsData } from '../data/programs.js'
-  
+
   export default {
-    name: 'Programs',
+    name: 'ProgramsPage',
     components: {
       ProgramCard
     },
@@ -77,11 +77,11 @@
       const searchQuery = ref('')
       const selectedCategory = ref('')
       const selectedPrice = ref('')
-  
+
       // BR (B.2): Dynamic Data - Filterable programs from data structure
       const filteredPrograms = computed(() => {
         let filtered = [...programsData]
-  
+
         // Search filter
         if (searchQuery.value) {
           const query = searchQuery.value.toLowerCase()
@@ -91,24 +91,24 @@
             program.description.toLowerCase().includes(query)
           )
         }
-  
+
         // Category filter
         if (selectedCategory.value) {
           filtered = filtered.filter(program =>
             program.category === selectedCategory.value
           )
         }
-  
+
         // Price filter
         if (selectedPrice.value) {
           filtered = filtered.filter(program =>
             program.price === selectedPrice.value
           )
         }
-  
+
         return filtered
       })
-  
+
       // Simulate loading when entering the page
       onMounted(() => {
         isLoading.value = true
@@ -116,7 +116,7 @@
           isLoading.value = false
         }, 800)
       })
-  
+
       return {
         isLoading,
         searchQuery,

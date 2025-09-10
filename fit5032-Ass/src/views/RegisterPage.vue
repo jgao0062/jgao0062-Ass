@@ -8,15 +8,15 @@
               <p class="text-center text-muted mb-4">
                 Register to access all our sports programs and community events
               </p>
-  
+
               <form @submit.prevent="submitRegistration">
                 <div class="row">
                   <div class="col-md-6">
                     <div class="mb-3">
                       <label class="form-label">First Name *</label>
-                      <input 
-                        type="text" 
-                        class="form-control" 
+                      <input
+                        type="text"
+                        class="form-control"
                         v-model="registration.firstName"
                         :class="getValidationClass('firstName')"
                         @blur="validateField('firstName')"
@@ -31,9 +31,9 @@
                   <div class="col-md-6">
                     <div class="mb-3">
                       <label class="form-label">Last Name *</label>
-                      <input 
-                        type="text" 
-                        class="form-control" 
+                      <input
+                        type="text"
+                        class="form-control"
                         v-model="registration.lastName"
                         :class="getValidationClass('lastName')"
                         @blur="validateField('lastName')"
@@ -46,12 +46,12 @@
                     </div>
                   </div>
                 </div>
-  
+
                 <div class="mb-3">
                   <label class="form-label">Email Address *</label>
-                  <input 
-                    type="email" 
-                    class="form-control" 
+                  <input
+                    type="email"
+                    class="form-control"
                     v-model="registration.email"
                     :class="getValidationClass('email')"
                     @blur="validateField('email')"
@@ -65,12 +65,12 @@
                     <i class="fas fa-check"></i> Valid email format
                   </div>
                 </div>
-  
+
                 <div class="mb-3">
                   <label class="form-label">Phone Number *</label>
-                  <input 
-                    type="tel" 
-                    class="form-control" 
+                  <input
+                    type="tel"
+                    class="form-control"
                     v-model="registration.phone"
                     :class="getValidationClass('phone')"
                     @blur="validateField('phone')"
@@ -89,9 +89,9 @@
                   <div class="col-md-6">
                     <div class="mb-3">
                       <label class="form-label">Password *</label>
-                      <input 
-                        type="password" 
-                        class="form-control" 
+                      <input
+                        type="password"
+                        class="form-control"
                         v-model="registration.password"
                         :class="getValidationClass('password')"
                         @blur="validateField('password')"
@@ -106,9 +106,9 @@
                   <div class="col-md-6">
                     <div class="mb-3">
                       <label class="form-label">Confirm Password *</label>
-                      <input 
-                        type="password" 
-                        class="form-control" 
+                      <input
+                        type="password"
+                        class="form-control"
                         v-model="registration.confirmPassword"
                         :class="getValidationClass('confirmPassword')"
                         @blur="validateField('confirmPassword')"
@@ -121,14 +121,14 @@
                     </div>
                   </div>
                 </div>
-  
+
                 <div class="row">
                   <div class="col-md-6">
                     <div class="mb-3">
                       <label class="form-label">Age *</label>
-                      <input 
-                        type="number" 
-                        class="form-control" 
+                      <input
+                        type="number"
+                        class="form-control"
                         v-model="registration.age"
                         :class="getValidationClass('age')"
                         @blur="validateField('age')"
@@ -156,15 +156,15 @@
                     </div>
                   </div>
                 </div>
-  
+
                 <div class="mb-3">
                   <label class="form-label">Interested Programs (Select all that apply)</label>
                   <div class="row">
                     <div class="col-md-6" v-for="program in availablePrograms.slice(0, 6)" :key="program.id">
                       <div class="form-check">
-                        <input 
-                          class="form-check-input" 
-                          type="checkbox" 
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
                           :value="program.name"
                           v-model="registration.interestedPrograms"
                           :id="'program-' + program.id"
@@ -176,12 +176,12 @@
                     </div>
                   </div>
                 </div>
-  
+
                 <div class="mb-3">
                   <label class="form-label">Emergency Contact Name *</label>
-                  <input 
-                    type="text" 
-                    class="form-control" 
+                  <input
+                    type="text"
+                    class="form-control"
                     v-model="registration.emergencyContact"
                     :class="getValidationClass('emergencyContact')"
                     @blur="validateField('emergencyContact')"
@@ -192,12 +192,12 @@
                   </div>
                   <div v-if="errors.emergencyContact" class="validation-error">{{ errors.emergencyContact }}</div>
                 </div>
-  
+
                 <div class="mb-3">
                   <label class="form-label">Emergency Contact Phone *</label>
-                  <input 
-                    type="tel" 
-                    class="form-control" 
+                  <input
+                    type="tel"
+                    class="form-control"
                     v-model="registration.emergencyPhone"
                     :class="getValidationClass('emergencyPhone')"
                     @blur="validateField('emergencyPhone')"
@@ -208,28 +208,28 @@
                   </div>
                   <div v-if="errors.emergencyPhone" class="validation-error">{{ errors.emergencyPhone }}</div>
                 </div>
-  
+
                 <div class="mb-4">
                   <div class="form-check">
-                    <input 
-                      class="form-check-input" 
-                      type="checkbox" 
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
                       v-model="registration.agreeTerms"
                       id="agreeTerms"
                       :class="{ 'is-invalid': errors.agreeTerms }"
                       @change="validateField('agreeTerms')"
                     >
                     <label class="form-check-label" for="agreeTerms">
-                      I agree to the <a href="#" class="text-primary">Terms and Conditions</a> 
+                      I agree to the <a href="#" class="text-primary">Terms and Conditions</a>
                       and <a href="#" class="text-primary">Privacy Policy</a> *
                     </label>
                     <div v-if="errors.agreeTerms" class="validation-error">{{ errors.agreeTerms }}</div>
                   </div>
                 </div>
-  
+
                 <div class="d-grid gap-2">
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     class="btn btn-primary btn-lg"
                     :disabled="isSubmitting"
                   >
@@ -243,18 +243,18 @@
                   </button>
                 </div>
               </form>
-  
+
               <!-- Success Message -->
               <div v-if="showSuccessMessage" class="alert alert-success mt-4">
                 <i class="fas fa-check-circle"></i>
-                <strong>Registration Successful!</strong> Welcome to our community. 
+                <strong>Registration Successful!</strong> Welcome to our community.
                 You'll receive a confirmation email shortly.
               </div>
 
               <!-- Login Link -->
               <div class="text-center mt-4">
                 <p class="text-muted">
-                  Already have an account? 
+                  Already have an account?
                   <router-link to="/login" class="text-primary text-decoration-none">
                     <i class="fas fa-sign-in-alt"></i> Sign In
                   </router-link>
@@ -266,19 +266,20 @@
       </div>
     </div>
   </template>
-  
+
   <script>
   import { ref, reactive } from 'vue'
   import { programsData } from '../data/programs.js'
   import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
-  
+
+
   export default {
-    name: 'Register',
+    name: 'RegisterPage',
     setup() {
       const isSubmitting = ref(false)
       const showSuccessMessage = ref(false)
       const availablePrograms = ref([...programsData])
-  
+
       // BR (B.1): Form data structure for dynamic binding
       const registration = reactive({
         firstName: '',
@@ -294,7 +295,7 @@
         emergencyPhone: '',
         agreeTerms: false
       })
-  
+
       const errors = reactive({
         firstName: '',
         lastName: '',
@@ -307,7 +308,7 @@
         emergencyPhone: '',
         agreeTerms: ''
       })
-  
+
             // BR (B.1): Two different types of validation
       const validateField = (fieldName) => {
         switch (fieldName) {
@@ -343,13 +344,13 @@
             break
         }
       }
-  
+
       const getValidationClass = (fieldName) => {
         if (errors[fieldName]) return 'is-invalid'
         if (registration[fieldName] && !errors[fieldName]) return 'is-valid'
         return ''
       }
-  
+
             const validateForm = () => {
         const fieldsToValidate = [
           'firstName', 'lastName', 'email', 'phone', 'password', 'confirmPassword', 'age',
@@ -359,7 +360,7 @@
         fieldsToValidate.forEach(field => validateField(field))
         return fieldsToValidate.every(field => !errors[field])
       }
-  
+
             // localStorage utility functions
       const saveToLocalStorage = (key, data) => {
         try {
@@ -382,7 +383,7 @@
         }
       }
 
-      const submitRegistration = () => {
+      const submitRegistration = async () => {
         if (!validateForm()) {
           return
         }
@@ -390,7 +391,7 @@
         isSubmitting.value = true
 
         // Simulate API call and update dynamic data
-        setTimeout(() => {
+        setTimeout(async () => {
           // BR (B.2): Update dynamic data after registration
           const registrationData = {
             ...registration,
@@ -401,7 +402,7 @@
           // Save to localStorage (BR B.2 requirement)
           const existingRegistrations = loadFromLocalStorage('registrations', [])
           existingRegistrations.push(registrationData)
-          
+
           // Save registration data
           saveToLocalStorage('registrations', existingRegistrations)
           saveToLocalStorage('latestRegistration', registrationData)
@@ -454,7 +455,7 @@
           }, 5000)
         }, 2000)
       }
-  
+
       return {
         registration,
         errors,
