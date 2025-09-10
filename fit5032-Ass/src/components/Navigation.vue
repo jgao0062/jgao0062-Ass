@@ -23,6 +23,9 @@
             <li class="nav-item">
               <router-link to="/register" class="nav-link" @click="closeMobileMenu">Join Us</router-link>
             </li>
+            <li class="nav-item">
+              <router-link to="/login" class="nav-link" @click="closeMobileMenu">Login</router-link>
+            </li>
           </ul>
         </div>
       </div>

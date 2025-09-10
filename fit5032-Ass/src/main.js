@@ -14,11 +14,13 @@ import './assets/styles/main.css'
 import Home from './views/Home.vue'
 import Programs from './views/Programs.vue'
 import Register from './views/Register.vue'
+import Login from './views/Login.vue'
 
 const routes = [
   { path: '/', component: Home },
   { path: '/programs', component: Programs },
-  { path: '/register', component: Register }
+  { path: '/register', component: Register },
+  { path: '/login', component: Login }
 ]
 
 const router = createRouter({
