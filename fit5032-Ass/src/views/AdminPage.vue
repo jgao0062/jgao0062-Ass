@@ -49,7 +49,10 @@
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">User Accounts</h5>
-            <button class="btn btn-sm btn-outline-primary" @click="exportUsers">Export</button>
+            <div>
+              <button class="btn btn-sm btn-success me-2" @click="showCreateAdmin = true">Create Admin</button>
+              <button class="btn btn-sm btn-outline-primary" @click="exportUsers">Export</button>
+            </div>
           </div>
           <div class="card-body">
             <div class="table-responsive">
@@ -60,6 +63,7 @@
                     <th>Email</th>
                     <th>Role</th>
                     <th>Joined</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -68,6 +72,16 @@
                     <td>{{ user.email }}</td>
                     <td><span class="badge" :class="user.role === 'admin' ? 'bg-danger' : 'bg-primary'">{{ user.role }}</span></td>
                     <td>{{ formatDate(user.id) }}</td>
+                    <td>
+                      <button
+                        class="btn btn-sm btn-outline-danger"
+                        @click="deleteUser(user.id)"
+                        :disabled="user.id === session?.userId"
+                        title="Cannot delete yourself"
+                      >
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -148,12 +162,54 @@
         </div>
       </div>
     </div>
+
+    <!-- Create Admin Modal -->
+    <div class="modal fade" :class="{ 'show': showCreateAdmin }" :style="{ display: showCreateAdmin ? 'block' : 'none' }" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Create New Admin</h5>
+            <button type="button" class="btn-close" @click="showCreateAdmin = false"></button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="createAdmin">
+              <div class="mb-3">
+                <label class="form-label">First Name</label>
+                <input type="text" class="form-control" v-model="newAdmin.firstName" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Last Name</label>
+                <input type="text" class="form-control" v-model="newAdmin.lastName" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" v-model="newAdmin.email" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-control" v-model="newAdmin.password" required>
+              </div>
+              <div v-if="createAdminError" class="alert alert-danger">{{ createAdminError }}</div>
+              <div v-if="createAdminSuccess" class="alert alert-success">{{ createAdminSuccess }}</div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showCreateAdmin = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="createAdmin" :disabled="creatingAdmin">
+              <span v-if="creatingAdmin" class="spinner-border spinner-border-sm me-2"></span>
+              Create Admin
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="showCreateAdmin" class="modal-backdrop fade show"></div>
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { getSession, getAllUsers, getRatings } from '../utils/auth.js'
+import { getSession, getAllUsers, getRatings, registerUser, deleteUser as deleteUserAuth } from '../utils/auth.js'
 
 export default {
   name: 'AdminPage',
@@ -162,6 +218,16 @@ export default {
     const users = ref([])
     const registrations = ref([])
     const ratings = ref({})
+    const showCreateAdmin = ref(false)
+    const creatingAdmin = ref(false)
+    const createAdminError = ref('')
+    const createAdminSuccess = ref('')
+    const newAdmin = ref({
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: ''
+    })
 
     const loadData = () => {
       users.value = getAllUsers()
@@ -234,6 +300,48 @@ export default {
       window.URL.revokeObjectURL(url)
     }
 
+    const createAdmin = async () => {
+      createAdminError.value = ''
+      createAdminSuccess.value = ''
+      creatingAdmin.value = true
+
+      try {
+        const result = await registerUser({
+          firstName: newAdmin.value.firstName,
+          lastName: newAdmin.value.lastName,
+          email: newAdmin.value.email,
+          password: newAdmin.value.password,
+          role: 'admin'
+        })
+
+        if (result.ok) {
+          createAdminSuccess.value = 'Admin created successfully!'
+          loadData() // Refresh user list
+          // Reset form
+          newAdmin.value = { firstName: '', lastName: '', email: '', password: '' }
+          setTimeout(() => {
+            showCreateAdmin.value = false
+            createAdminSuccess.value = ''
+          }, 2000)
+        } else {
+          createAdminError.value = result.message || 'Failed to create admin'
+        }
+      } catch {
+        createAdminError.value = 'An error occurred while creating admin'
+      }
+
+      creatingAdmin.value = false
+    }
+
+    const deleteUser = (userId) => {
+      if (confirm('Are you sure you want to delete this user?')) {
+        const result = deleteUserAuth(userId)
+        if (result.ok) {
+          loadData() // Refresh user list
+        }
+      }
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -247,7 +355,14 @@ export default {
       formatDate,
       exportUsers,
       exportRegistrations,
-      exportRatings
+      exportRatings,
+      showCreateAdmin,
+      newAdmin,
+      creatingAdmin,
+      createAdminError,
+      createAdminSuccess,
+      createAdmin,
+      deleteUser
     }
   }
 }

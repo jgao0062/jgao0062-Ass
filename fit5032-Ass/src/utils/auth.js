@@ -105,14 +105,41 @@ export function hasRole(requiredRole) {
   return session.role === requiredRole
 }
 
+export function deleteUser(userId) {
+  const users = getAllUsers()
+  const filteredUsers = users.filter(u => u.id !== userId)
+  writeJSON(USERS_KEY, filteredUsers)
+  return { ok: true, message: 'User deleted successfully' }
+}
+
+// Update existing admin email and password
+export async function updateAdminCredentials() {
+  const users = getAllUsers()
+  const adminIndex = users.findIndex(u => u.role === 'admin')
+  if (adminIndex !== -1) {
+    const newEmail = 'admin@gmail.com'
+    const newPasswordHash = await hashString('Admin1234')
+    users[adminIndex] = {
+      ...users[adminIndex],
+      email: newEmail,
+      passwordHash: newPasswordHash
+    }
+    writeJSON(USERS_KEY, users)
+  }
+}
+
 // Seed an admin user for demo if none exists
 export async function ensureDefaultAdmin() {
   const users = getAllUsers()
   const hasAdmin = users.some(u => u.role === 'admin')
-  if (hasAdmin) return
-  const email = 'admin@5032.com'
+  if (hasAdmin) {
+    // Update existing admin credentials
+    await updateAdminCredentials()
+    return
+  }
+  const email = 'admin@gmail.com'
   if (!users.some(u => u.email === email)) {
-    await registerUser({ firstName: 'Admin', lastName: 'User', email, password: 'admin1234', role: 'admin' })
+    await registerUser({ firstName: 'Admin', lastName: 'User', email, password: 'Admin1234', role: 'admin' })
   }
 }
 
