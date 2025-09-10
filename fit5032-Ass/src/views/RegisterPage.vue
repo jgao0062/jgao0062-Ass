@@ -271,6 +271,7 @@
   import { ref, reactive } from 'vue'
   import { programsData } from '../data/programs.js'
   import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
+  import { registerUser, sanitizeInput } from '../utils/auth.js'
 
 
   export default {
@@ -398,6 +399,15 @@
             registrationDate: new Date().toISOString(),
             id: Date.now()
           }
+
+          // Create local auth account (basic auth)
+          await registerUser({
+            firstName: sanitizeInput(registration.firstName),
+            lastName: sanitizeInput(registration.lastName),
+            email: registration.email,
+            password: registration.password,
+            role: 'user'
+          })
 
           // Save to localStorage (BR B.2 requirement)
           const existingRegistrations = loadFromLocalStorage('registrations', [])

@@ -4,9 +4,9 @@
         <router-link to="/" class="navbar-brand">
           <i class="fas fa-heartbeat"></i> Melbourne Community Sports Health
         </router-link>
-        <button 
-          class="navbar-toggler" 
-          type="button" 
+        <button
+          class="navbar-toggler"
+          type="button"
           @click="toggleMobileMenu"
           :aria-expanded="showMobileMenu"
         >
@@ -23,35 +23,54 @@
             <li class="nav-item">
               <router-link to="/register" class="nav-link" @click="closeMobileMenu">Join Us</router-link>
             </li>
-            <li class="nav-item">
+            <li class="nav-item" v-if="!session">
               <router-link to="/login" class="nav-link" @click="closeMobileMenu">Login</router-link>
+            </li>
+            <li class="nav-item dropdown" v-else>
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ session.firstName || session.email }}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><button class="dropdown-item" @click="onLogout">Logout</button></li>
+              </ul>
             </li>
           </ul>
         </div>
       </div>
     </nav>
   </template>
-  
+
   <script>
   import { ref } from 'vue'
-  
+  import { getSession, logout } from '../utils/auth.js'
+
   export default {
-    name: 'Navigation',
+    name: 'NavigationComponent',
     setup() {
       const showMobileMenu = ref(false)
-  
+      const session = ref(getSession())
+
       const toggleMobileMenu = () => {
         showMobileMenu.value = !showMobileMenu.value
       }
-  
+
       const closeMobileMenu = () => {
         showMobileMenu.value = false
       }
-  
+
+      const onLogout = () => {
+        logout()
+        session.value = null
+        closeMobileMenu()
+        window.location.href = '/'
+      }
+
       return {
         showMobileMenu,
         toggleMobileMenu,
-        closeMobileMenu
+        closeMobileMenu,
+        session,
+        onLogout
       }
     }
   }
