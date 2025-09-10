@@ -11,10 +11,10 @@ import '@fortawesome/fontawesome-free/css/all.min.css'
 import './assets/styles/main.css'
 
 // Import views
-import Home from './views/Home.vue'
-import Programs from './views/Programs.vue'
-import Register from './views/Register.vue'
-import Login from './views/Login.vue'
+import Home from './views/HomePage.vue'
+import Programs from './views/ProgramsPage.vue'
+import Register from './views/RegisterPage.vue'
+import Login from './views/LoginPage.vue'
 
 const routes = [
   { path: '/', component: Home },
