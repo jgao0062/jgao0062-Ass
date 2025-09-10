@@ -53,8 +53,10 @@ export default {
         error.value = res.message || 'Login failed'
         return
       }
-      // Navigate back or to home
-      window.history.length > 1 ? history.back() : (window.location.href = '/')
+      // Redirect to intended page or home
+      const params = new URLSearchParams(window.location.search)
+      const redirect = params.get('redirect') || '/'
+      window.location.replace(redirect)
     }
 
     return { email, password, error, submitting, onSubmit }

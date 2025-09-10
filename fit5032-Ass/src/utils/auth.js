@@ -105,6 +105,17 @@ export function hasRole(requiredRole) {
   return session.role === requiredRole
 }
 
+// Seed an admin user for demo if none exists
+export async function ensureDefaultAdmin() {
+  const users = getAllUsers()
+  const hasAdmin = users.some(u => u.role === 'admin')
+  if (hasAdmin) return
+  const email = 'admin@example.com'
+  if (!users.some(u => u.email === email)) {
+    await registerUser({ firstName: 'Admin', lastName: 'User', email, password: 'Admin1234', role: 'admin' })
+  }
+}
+
 // Ratings storage: prevent double rating per (programId + userId)
 const RATINGS_KEY = 'program_ratings'
 
