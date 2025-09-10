@@ -110,9 +110,9 @@ export async function ensureDefaultAdmin() {
   const users = getAllUsers()
   const hasAdmin = users.some(u => u.role === 'admin')
   if (hasAdmin) return
-  const email = 'admin@example.com'
+  const email = 'admin@5032.com'
   if (!users.some(u => u.email === email)) {
-    await registerUser({ firstName: 'Admin', lastName: 'User', email, password: 'Admin1234', role: 'admin' })
+    await registerUser({ firstName: 'Admin', lastName: 'User', email, password: 'admin1234', role: 'admin' })
   }
 }
 
