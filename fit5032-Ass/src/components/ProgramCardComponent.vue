@@ -4,14 +4,24 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-3">
             <h5 class="card-title">{{ program.name }}</h5>
-            <span 
-              class="badge" 
+            <span
+              class="badge"
               :class="program.price === 'Free' ? 'bg-success' : 'bg-primary'"
             >
               {{ program.price }}
             </span>
           </div>
           <p class="card-text">{{ program.description }}</p>
+
+          <!-- BR (C.3): Rating - Display rating component -->
+          <div class="mb-3">
+            <RatingComponent
+              :program-id="program.id"
+              :show-user-rating="true"
+              :show-summary="false"
+            />
+          </div>
+
           <div class="mb-3">
             <small class="text-muted">
               <i class="fas fa-tag"></i> {{ program.category }}<br>
@@ -27,12 +37,16 @@
       </div>
     </div>
   </template>
-  
+
   <script>
   import { inject } from 'vue'
-  
+  import RatingComponent from './RatingComponent.vue'
+
   export default {
     name: 'ProgramCard',
+    components: {
+      RatingComponent
+    },
     props: {
       program: {
         type: Object,
@@ -45,7 +59,7 @@
     },
     setup() {
       const selectProgram = inject('selectProgram')
-  
+
       return {
         selectProgram
       }

@@ -167,7 +167,18 @@ export function userHasRated(programId, userId) {
 export function addRating(programId, userId, value) {
   const all = getRatings()
   const list = all[programId] || []
-  list.push({ userId, value: Math.max(1, Math.min(5, Number(value))) })
+
+  // Check if user has already rated this program
+  const existingRatingIndex = list.findIndex(r => r.userId === userId)
+
+  if (existingRatingIndex !== -1) {
+    // Update existing rating
+    list[existingRatingIndex] = { userId, value: Math.max(1, Math.min(5, Number(value))) }
+  } else {
+    // Add new rating
+    list.push({ userId, value: Math.max(1, Math.min(5, Number(value))) })
+  }
+
   all[programId] = list
   writeJSON(RATINGS_KEY, all)
 }

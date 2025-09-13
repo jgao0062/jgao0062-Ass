@@ -53,6 +53,8 @@ export default {
         error.value = res.message || 'Login failed'
         return
       }
+      // Trigger login event for other components
+      window.dispatchEvent(new CustomEvent('userLoggedIn'))
       // Redirect to intended page or home
       const params = new URLSearchParams(window.location.search)
       const redirect = params.get('redirect') || '/'

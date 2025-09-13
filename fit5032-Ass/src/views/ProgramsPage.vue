@@ -64,7 +64,7 @@
 
   <script>
   import { ref, computed, onMounted } from 'vue'
-  import ProgramCard from '../components/ProgramCard.vue'
+  import ProgramCard from '../components/ProgramCardComponent.vue'
   import { programsData } from '../data/programs.js'
 
   export default {

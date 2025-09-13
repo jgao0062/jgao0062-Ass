@@ -47,7 +47,7 @@
   <script>
   import { computed } from 'vue'
   import StatsSection from '../components/StatsSection.vue'
-  import ProgramCard from '../components/ProgramCard.vue'
+  import ProgramCard from '../components/ProgramCardComponent.vue'
   import { programsData } from '../data/programs.js'
 
   export default {

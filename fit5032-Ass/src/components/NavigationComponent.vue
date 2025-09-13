@@ -63,6 +63,8 @@
         logout()
         session.value = null
         closeMobileMenu()
+        // Trigger logout event for other components
+        window.dispatchEvent(new CustomEvent('userLoggedOut'))
         window.location.href = '/'
       }
 

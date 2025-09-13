@@ -88,7 +88,7 @@ export const programsData = [
       participants: 22
     }
   ]
-  
+
   export const statsData = {
     totalPrograms: 8,
     participants: 175,
