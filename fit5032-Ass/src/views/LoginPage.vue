@@ -35,6 +35,7 @@
 <script>
 import { ref } from 'vue'
 import { login } from '../utils/auth.js'
+import { escapeHtml, securityLog } from '../utils/security.js'
 
 export default {
   name: 'LoginPage',
@@ -47,18 +48,38 @@ export default {
     const onSubmit = async () => {
       error.value = ''
       submitting.value = true
-      const res = await login(email.value, password.value)
-      submitting.value = false
-      if (!res.ok) {
-        error.value = res.message || 'Login failed'
-        return
+
+      try {
+        const res = await login(email.value, password.value)
+        submitting.value = false
+
+        if (!res.ok) {
+          // Escape error message to prevent XSS
+          error.value = escapeHtml(res.message || 'Login failed')
+          securityLog('warning', 'Login failed', { email: email.value, reason: res.message })
+          return
+        }
+
+        securityLog('info', 'User login successful', { email: email.value })
+
+        // Trigger login event for other components
+        window.dispatchEvent(new CustomEvent('userLoggedIn'))
+
+        // Redirect to intended page or home
+        const params = new URLSearchParams(window.location.search)
+        const redirect = params.get('redirect') || '/'
+
+        // Validate redirect URL security
+        if (redirect.startsWith('/') || redirect.startsWith(window.location.origin)) {
+          window.location.replace(redirect)
+        } else {
+          window.location.replace('/')
+        }
+      } catch (err) {
+        submitting.value = false
+        error.value = 'An unexpected error occurred. Please try again.'
+        securityLog('error', 'Login error', { email: email.value, error: err.message })
       }
-      // Trigger login event for other components
-      window.dispatchEvent(new CustomEvent('userLoggedIn'))
-      // Redirect to intended page or home
-      const params = new URLSearchParams(window.location.search)
-      const redirect = params.get('redirect') || '/'
-      window.location.replace(redirect)
     }
 
     return { email, password, error, submitting, onSubmit }

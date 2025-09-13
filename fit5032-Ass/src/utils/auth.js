@@ -1,4 +1,13 @@
 // Lightweight local auth and security helpers
+// BR (C.4): Enhanced Security - XSS Protection and Authentication Security
+
+import {
+  sanitizeInput,
+  sanitizeEmail,
+  securityLog,
+  checkRateLimit,
+  generateCSRFToken
+} from './security.js'
 
 // One-way hash: use Web Crypto, fallback to a simple non-crypto hash
 export async function hashString(plain) {
@@ -19,15 +28,10 @@ export async function hashString(plain) {
   }
 }
 
-// Sanitize input: remove script tags and escape angle brackets
-export function sanitizeInput(value) {
-  if (value == null) return ''
-  const str = String(value)
-  return str
-    .replace(/<\s*script[^>]*>.*?<\s*\/\s*script\s*>/gis, '')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .trim()
+// Use sanitizeInput function from security.js
+// Keep a simple wrapper function for backward compatibility
+export function sanitizeInputLegacy(value) {
+  return sanitizeInput(value)
 }
 
 // Storage keys
@@ -52,16 +56,34 @@ export function getAllUsers() {
 }
 
 export function findUserByEmail(email) {
-  const safeEmail = String(email || '').toLowerCase()
+  const safeEmail = sanitizeEmail(email)
+  if (!safeEmail) {
+    securityLog('warning', 'Invalid email format attempted', { email })
+    return null
+  }
   return getAllUsers().find(u => u.email === safeEmail) || null
 }
 
 export async function registerUser({ firstName, lastName, email, password, role = 'user' }) {
   const users = getAllUsers()
-  const safeEmail = String(email || '').toLowerCase()
+  const safeEmail = sanitizeEmail(email)
+
+  if (!safeEmail) {
+    securityLog('warning', 'Registration attempt with invalid email', { email })
+    return { ok: false, message: 'Invalid email format' }
+  }
+
   if (users.some(u => u.email === safeEmail)) {
+    securityLog('info', 'Registration attempt with existing email', { email: safeEmail })
     return { ok: false, message: 'Email already registered' }
   }
+
+  // Validate password strength
+  if (!password || password.length < 8) {
+    securityLog('warning', 'Registration attempt with weak password', { email: safeEmail })
+    return { ok: false, message: 'Password must be at least 8 characters long' }
+  }
+
   const hashed = await hashString(password || '')
   const user = {
     id: Date.now(),
@@ -69,24 +91,69 @@ export async function registerUser({ firstName, lastName, email, password, role 
     lastName: sanitizeInput(lastName),
     email: safeEmail,
     passwordHash: hashed,
-    role
+    role,
+    createdAt: new Date().toISOString(),
+    lastLogin: null
   }
   users.push(user)
   writeJSON(USERS_KEY, users)
+
+  securityLog('info', 'User registered successfully', { userId: user.id, email: safeEmail, role })
   return { ok: true, user }
 }
 
 export async function login(email, password) {
+  // Check rate limit
+  const safeEmail = sanitizeEmail(email)
+  if (!safeEmail) {
+    securityLog('warning', 'Login attempt with invalid email format', { email })
+    return { ok: false, message: 'Invalid credentials' }
+  }
+
+  if (!checkRateLimit(`login_${safeEmail}`, 5, 300000)) { // 5 attempts, 5 minute window
+    securityLog('warning', 'Login rate limit exceeded', { email: safeEmail })
+    return { ok: false, message: 'Too many login attempts. Please try again later.' }
+  }
+
   const user = findUserByEmail(email)
-  if (!user) return { ok: false, message: 'Invalid credentials' }
+  if (!user) {
+    securityLog('warning', 'Login attempt with non-existent email', { email: safeEmail })
+    return { ok: false, message: 'Invalid credentials' }
+  }
+
   const hashed = await hashString(password || '')
-  if (user.passwordHash !== hashed) return { ok: false, message: 'Invalid credentials' }
-  const session = { userId: user.id, role: user.role, email: user.email, firstName: user.firstName, ts: Date.now() }
+  if (user.passwordHash !== hashed) {
+    securityLog('warning', 'Login attempt with incorrect password', { email: safeEmail, userId: user.id })
+    return { ok: false, message: 'Invalid credentials' }
+  }
+
+  // Update last login time
+  const users = getAllUsers()
+  const userIndex = users.findIndex(u => u.id === user.id)
+  if (userIndex !== -1) {
+    users[userIndex].lastLogin = new Date().toISOString()
+    writeJSON(USERS_KEY, users)
+  }
+
+  const session = {
+    userId: user.id,
+    role: user.role,
+    email: user.email,
+    firstName: user.firstName,
+    ts: Date.now(),
+    csrfToken: generateCSRFToken()
+  }
   writeJSON(SESSION_KEY, session)
+
+  securityLog('info', 'User logged in successfully', { userId: user.id, email: safeEmail })
   return { ok: true, session }
 }
 
 export function logout() {
+  const session = getSession()
+  if (session) {
+    securityLog('info', 'User logged out', { userId: session.userId, email: session.email })
+  }
   localStorage.removeItem(SESSION_KEY)
 }
 
@@ -181,6 +248,73 @@ export function addRating(programId, userId, value) {
 
   all[programId] = list
   writeJSON(RATINGS_KEY, all)
+}
+
+// User Activities Management
+const USER_ACTIVITIES_KEY = 'user_activities'
+
+export function getUserActivities(userId) {
+  const allActivities = readJSON(USER_ACTIVITIES_KEY, {})
+  return allActivities[userId] || []
+}
+
+export function addUserActivity(userId, programId, programName) {
+  const allActivities = readJSON(USER_ACTIVITIES_KEY, {})
+  const userActivities = allActivities[userId] || []
+
+  // Check if user already joined this program
+  const existingActivity = userActivities.find(activity => activity.programId === programId)
+
+  if (!existingActivity) {
+    const newActivity = {
+      programId,
+      programName,
+      joinedDate: new Date().toISOString(),
+      status: 'upcoming'
+    }
+
+    userActivities.push(newActivity)
+    allActivities[userId] = userActivities
+    writeJSON(USER_ACTIVITIES_KEY, allActivities)
+
+    securityLog('info', 'User joined program', {
+      userId,
+      programId,
+      programName
+    })
+
+    return { success: true, message: `Successfully joined ${programName}!` }
+  } else {
+    return { success: false, message: 'You have already joined this program' }
+  }
+}
+
+export function removeUserActivity(userId, programId) {
+  const allActivities = readJSON(USER_ACTIVITIES_KEY, {})
+  const userActivities = allActivities[userId] || []
+
+  const activityIndex = userActivities.findIndex(activity => activity.programId === programId)
+
+  if (activityIndex !== -1) {
+    const removedActivity = userActivities.splice(activityIndex, 1)[0]
+    allActivities[userId] = userActivities
+    writeJSON(USER_ACTIVITIES_KEY, allActivities)
+
+    securityLog('info', 'User left program', {
+      userId,
+      programId,
+      programName: removedActivity.programName
+    })
+
+    return { success: true, message: `Left ${removedActivity.programName}` }
+  } else {
+    return { success: false, message: 'Activity not found' }
+  }
+}
+
+export function hasUserJoinedProgram(userId, programId) {
+  const userActivities = getUserActivities(userId)
+  return userActivities.some(activity => activity.programId === programId)
 }
 
 

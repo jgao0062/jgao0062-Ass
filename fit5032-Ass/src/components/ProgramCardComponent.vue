@@ -30,8 +30,13 @@
               <i class="fas fa-users"></i> {{ program.participants }} participants
             </small>
           </div>
-          <button class="btn btn-primary" @click="selectProgram(program)">
-            {{ buttonText }}
+          <button
+            class="btn"
+            :class="getButtonClass()"
+            @click="handleButtonClick"
+            :disabled="isAdmin && buttonText === 'Join Program'"
+          >
+            {{ getButtonText() }}
           </button>
         </div>
       </div>
@@ -39,8 +44,9 @@
   </template>
 
   <script>
-  import { inject } from 'vue'
+  import { inject, computed } from 'vue'
   import RatingComponent from './RatingComponent.vue'
+  import { getSession } from '../utils/auth.js'
 
   export default {
     name: 'ProgramCard',
@@ -57,11 +63,49 @@
         default: 'Learn More'
       }
     },
-    setup() {
+    emits: ['learn-more', 'join-program'],
+    setup(props, { emit }) {
       const selectProgram = inject('selectProgram')
+      const session = getSession()
+
+      // Check if current user is admin
+      const isAdmin = computed(() => {
+        return session && session.role === 'admin'
+      })
+
+      const getButtonText = () => {
+        if (props.buttonText === 'Join Program' && isAdmin.value) {
+          return 'Admin Only'
+        }
+        return props.buttonText
+      }
+
+      const getButtonClass = () => {
+        if (props.buttonText === 'Join Program' && isAdmin.value) {
+          return 'btn-secondary'
+        }
+        return 'btn-primary'
+      }
+
+      const handleButtonClick = () => {
+        if (props.buttonText === 'Learn More') {
+          emit('learn-more', props.program)
+        } else if (props.buttonText === 'Join Program' && !isAdmin.value) {
+          emit('join-program', props.program)
+        } else {
+          // Fallback to old behavior
+          if (selectProgram) {
+            selectProgram(props.program)
+          }
+        }
+      }
 
       return {
-        selectProgram
+        selectProgram,
+        handleButtonClick,
+        isAdmin,
+        getButtonText,
+        getButtonClass
       }
     }
   }

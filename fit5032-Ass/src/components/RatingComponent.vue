@@ -19,7 +19,7 @@
     </div>
 
     <!-- User Rating Input -->
-    <div class="user-rating" v-if="showUserRating">
+    <div class="user-rating" v-if="showUserRating && !isAdmin">
       <div class="mb-2">
         <small class="text-muted" v-if="session">Your rating:</small>
         <small class="text-muted" v-else>Please login to rate</small>
@@ -50,8 +50,12 @@
           <i class="fas fa-check-circle me-1"></i>
           Rating saved: {{ userRating }} stars
         </small>
-        <small v-else-if="session" class="text-muted">
+        <small v-else-if="session && !isAdmin" class="text-muted">
           Click stars or buttons to rate
+        </small>
+        <small v-else-if="isAdmin" class="text-info">
+          <i class="fas fa-info-circle me-1"></i>
+          Admins cannot rate programs
         </small>
         <small v-else class="text-muted">
           <router-link to="/login" class="text-decoration-none">Login</router-link> to rate programs
@@ -64,6 +68,7 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { getSession, addRating, userHasRated, getProgramAverageRating } from '../utils/auth.js'
+import { securityLog, sanitizeNumber } from '../utils/security.js'
 
 export default {
   name: 'RatingComponent',
@@ -87,6 +92,11 @@ export default {
     const session = ref(getSession())
     const averageRating = ref(0)
     const totalRatings = ref(0)
+
+    // Check if current user is admin
+    const isAdmin = computed(() => {
+      return session.value && session.value.role === 'admin'
+    })
 
     // Load current rating data
     const loadRatingData = () => {
@@ -115,6 +125,14 @@ export default {
 
     // Set user rating function
     const setRating = (rating) => {
+      // Validate and sanitize rating input
+      const sanitizedRating = sanitizeNumber(rating, 1, 5)
+      if (sanitizedRating === null) {
+        validationError.value = 'Invalid rating value'
+        securityLog('warning', 'Invalid rating input', { rating, programId: props.programId })
+        return
+      }
+
       // Always refresh session state
       session.value = getSession()
 
@@ -124,8 +142,8 @@ export default {
       }
 
       try {
-        addRating(props.programId, session.value.userId, rating)
-        userRating.value = rating
+        addRating(props.programId, session.value.userId, sanitizedRating)
+        userRating.value = sanitizedRating
         validationError.value = ''
 
         // Reload rating data
@@ -133,10 +151,21 @@ export default {
 
         // Emit event to parent component
         window.dispatchEvent(new CustomEvent('ratingUpdated', {
-          detail: { programId: props.programId, rating }
+          detail: { programId: props.programId, rating: sanitizedRating }
         }))
+
+        securityLog('info', 'Rating submitted successfully', {
+          programId: props.programId,
+          userId: session.value.userId,
+          rating: sanitizedRating
+        })
       } catch (error) {
         validationError.value = 'Error saving rating: ' + error.message
+        securityLog('error', 'Rating submission failed', {
+          programId: props.programId,
+          userId: session.value.userId,
+          error: error.message
+        })
         console.error('Error saving rating:', error)
       }
     }
@@ -147,6 +176,7 @@ export default {
       averageRating,
       totalRatings,
       session,
+      isAdmin,
       setRating
     }
   }

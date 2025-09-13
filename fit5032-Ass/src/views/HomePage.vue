@@ -37,26 +37,39 @@
               :key="program.id"
               :program="program"
               button-text="Learn More"
+              @learn-more="showProgramDetail"
             />
           </div>
         </div>
       </section>
+
+      <!-- Program Detail Modal -->
+      <ProgramDetailModal
+        :show="showModal"
+        :program="selectedProgram"
+        @close="closeModal"
+      />
     </div>
   </template>
 
   <script>
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
   import StatsSection from '../components/StatsSection.vue'
   import ProgramCard from '../components/ProgramCardComponent.vue'
+  import ProgramDetailModal from '../components/ProgramDetailModal.vue'
   import { programsData } from '../data/programs.js'
 
   export default {
     name: 'HomePage',
     components: {
       StatsSection,
-      ProgramCard
+      ProgramCard,
+      ProgramDetailModal
     },
     setup() {
+      const showModal = ref(false)
+      const selectedProgram = ref(null)
+
       // BR (B.2): Dynamic Data - Featured programs from data structure
       const featuredPrograms = computed(() => {
         return [...programsData]
@@ -64,8 +77,22 @@
           .slice(0, 3)
       })
 
+      const showProgramDetail = (program) => {
+        selectedProgram.value = program
+        showModal.value = true
+      }
+
+      const closeModal = () => {
+        showModal.value = false
+        selectedProgram.value = null
+      }
+
       return {
-        featuredPrograms
+        featuredPrograms,
+        showModal,
+        selectedProgram,
+        showProgramDetail,
+        closeModal
       }
     }
   }

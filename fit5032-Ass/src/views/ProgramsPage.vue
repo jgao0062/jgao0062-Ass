@@ -37,6 +37,12 @@
         </div>
       </div>
 
+      <!-- Join Message -->
+      <div v-if="joinMessage" class="alert" :class="`alert-${joinMessageType}`" role="alert">
+        <i class="fas fa-info-circle me-2"></i>
+        {{ joinMessage }}
+      </div>
+
       <!-- Programs Grid -->
       <div class="row" v-if="!isLoading">
         <ProgramCard
@@ -44,6 +50,7 @@
           :key="program.id"
           :program="program"
           button-text="Join Program"
+          @join-program="handleJoinProgram"
         />
       </div>
 
@@ -66,6 +73,7 @@
   import { ref, computed, onMounted } from 'vue'
   import ProgramCard from '../components/ProgramCardComponent.vue'
   import { programsData } from '../data/programs.js'
+  import { getSession, addUserActivity } from '../utils/auth.js'
 
   export default {
     name: 'ProgramsPage',
@@ -77,6 +85,8 @@
       const searchQuery = ref('')
       const selectedCategory = ref('')
       const selectedPrice = ref('')
+      const joinMessage = ref('')
+      const joinMessageType = ref('')
 
       // BR (B.2): Dynamic Data - Filterable programs from data structure
       const filteredPrograms = computed(() => {
@@ -109,6 +119,48 @@
         return filtered
       })
 
+      // Handle join program
+      const handleJoinProgram = (program) => {
+        const session = getSession()
+
+        if (!session) {
+          joinMessage.value = 'Please login to join programs'
+          joinMessageType.value = 'danger'
+          setTimeout(() => {
+            joinMessage.value = ''
+            joinMessageType.value = ''
+          }, 3000)
+          return
+        }
+
+        // Check if user is admin
+        if (session.role === 'admin') {
+          joinMessage.value = 'Admins cannot join programs. Use Admin panel to manage programs.'
+          joinMessageType.value = 'info'
+          setTimeout(() => {
+            joinMessage.value = ''
+            joinMessageType.value = ''
+          }, 3000)
+          return
+        }
+
+        const result = addUserActivity(session.userId, program.id, program.name)
+
+        if (result.success) {
+          joinMessage.value = result.message
+          joinMessageType.value = 'success'
+        } else {
+          joinMessage.value = result.message
+          joinMessageType.value = 'warning'
+        }
+
+        // Clear message after 3 seconds
+        setTimeout(() => {
+          joinMessage.value = ''
+          joinMessageType.value = ''
+        }, 3000)
+      }
+
       // Simulate loading when entering the page
       onMounted(() => {
         isLoading.value = true
@@ -122,7 +174,10 @@
         searchQuery,
         selectedCategory,
         selectedPrice,
-        filteredPrograms
+        filteredPrograms,
+        joinMessage,
+        joinMessageType,
+        handleJoinProgram
       }
     }
   }

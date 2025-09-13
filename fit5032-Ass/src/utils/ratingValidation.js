@@ -1,4 +1,7 @@
 // BR (C.3): Rating - Validation utilities
+// BR (C.4): Enhanced Security - XSS Protection and Input Validation
+
+import { sanitizeInput, sanitizeNumber, securityLog } from './security.js'
 export const ratingValidation = {
   // Validate rating input
   validateRatingInput(rating) {
@@ -6,23 +9,22 @@ export const ratingValidation = {
 
     if (rating === null || rating === undefined) {
       errors.push('Rating cannot be empty')
+      return { isValid: false, errors }
     }
 
-    if (typeof rating !== 'number') {
-      errors.push('Rating must be a number')
-    }
-
-    if (rating < 1 || rating > 5) {
-      errors.push('Rating must be between 1-5')
-    }
-
-    if (!Number.isInteger(rating)) {
+    // Sanitize and validate input
+    const sanitizedRating = sanitizeNumber(rating, 1, 5)
+    if (sanitizedRating === null) {
+      errors.push('Rating must be a valid number between 1-5')
+      securityLog('warning', 'Invalid rating input attempted', { rating })
+    } else if (!Number.isInteger(sanitizedRating)) {
       errors.push('Rating must be an integer')
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
+      sanitizedRating
     }
   },
 
@@ -32,15 +34,25 @@ export const ratingValidation = {
 
     if (!userId || userId.trim() === '') {
       errors.push('User ID cannot be empty')
+      return { isValid: false, errors }
     }
 
-    if (userId.length < 3) {
+    // Sanitize user ID input
+    const sanitizedUserId = sanitizeInput(userId.toString())
+    if (sanitizedUserId.length < 3) {
       errors.push('User ID must be at least 3 characters')
+    }
+
+    // Check for dangerous characters
+    if (/<script|javascript:|vbscript:/i.test(sanitizedUserId)) {
+      errors.push('User ID contains invalid characters')
+      securityLog('warning', 'Suspicious user ID input', { userId })
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
+      sanitizedUserId
     }
   },
 
@@ -50,19 +62,20 @@ export const ratingValidation = {
 
     if (programId === null || programId === undefined) {
       errors.push('Program ID cannot be empty')
+      return { isValid: false, errors }
     }
 
-    if (typeof programId !== 'number') {
-      errors.push('Program ID must be a number')
-    }
-
-    if (programId <= 0) {
-      errors.push('Program ID must be a positive number')
+    // Sanitize and validate program ID
+    const sanitizedProgramId = sanitizeNumber(programId, 1, Infinity)
+    if (sanitizedProgramId === null) {
+      errors.push('Program ID must be a valid positive number')
+      securityLog('warning', 'Invalid program ID input', { programId })
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
+      sanitizedProgramId
     }
   },
 
@@ -87,20 +100,9 @@ export const ratingValidation = {
     }
   },
 
-  // Sanitize rating input
+  // Sanitize rating input - use sanitizeNumber from security.js
   sanitizeRating(rating) {
-    if (typeof rating === 'string') {
-      const parsed = parseFloat(rating)
-      if (!isNaN(parsed)) {
-        return Math.round(parsed)
-      }
-    }
-
-    if (typeof rating === 'number') {
-      return Math.round(rating)
-    }
-
-    return null
+    return sanitizeNumber(rating, 1, 5)
   },
 
   // Format rating display

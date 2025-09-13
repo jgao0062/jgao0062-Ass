@@ -271,7 +271,8 @@
   import { ref, reactive } from 'vue'
   import { programsData } from '../data/programs.js'
   import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
-  import { registerUser, sanitizeInput } from '../utils/auth.js'
+  import { registerUser } from '../utils/auth.js'
+  import { escapeHtml, securityLog } from '../utils/security.js'
 
 
   export default {
@@ -401,13 +402,21 @@
           }
 
           // Create local auth account (basic auth)
-          await registerUser({
-            firstName: sanitizeInput(registration.firstName),
-            lastName: sanitizeInput(registration.lastName),
+          const registerResult = await registerUser({
+            firstName: registration.firstName,
+            lastName: registration.lastName,
             email: registration.email,
             password: registration.password,
             role: 'user'
           })
+
+          if (!registerResult.ok) {
+            securityLog('error', 'Registration failed', {
+              email: registration.email,
+              reason: registerResult.message
+            })
+            throw new Error(registerResult.message)
+          }
 
           // Save to localStorage (BR B.2 requirement)
           const existingRegistrations = loadFromLocalStorage('registrations', [])
@@ -456,6 +465,10 @@
           isSubmitting.value = false
           showSuccessMessage.value = true
 
+          securityLog('info', 'Registration completed successfully', {
+            userId: registerResult.user.id,
+            email: registration.email
+          })
           console.log('Registration completed and saved to localStorage!')
           console.log('Check localStorage in DevTools under Application > Storage > Local Storage')
 

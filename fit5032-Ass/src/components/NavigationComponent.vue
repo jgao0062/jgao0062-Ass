@@ -31,7 +31,9 @@
                 {{ session.firstName || session.email }}
               </a>
               <ul class="dropdown-menu dropdown-menu-end">
+                <li><router-link to="/my-activities" class="dropdown-item" v-if="session && session.role !== 'admin'">My Activities</router-link></li>
                 <li><router-link to="/admin" class="dropdown-item" v-if="session && session.role==='admin'">Admin</router-link></li>
+                <li><hr class="dropdown-divider" v-if="session && session.role !== 'admin'"></li>
                 <li><button class="dropdown-item" @click="onLogout">Logout</button></li>
               </ul>
             </li>
