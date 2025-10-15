@@ -61,8 +61,8 @@
         showMobileMenu.value = false
       }
 
-      const onLogout = () => {
-        logout()
+      const onLogout = async () => {
+        await logout()
         session.value = null
         closeMobileMenu()
         // Trigger logout event for other components

@@ -21,7 +21,7 @@ import Register from './views/RegisterPage.vue'
 import Login from './views/LoginPage.vue'
 import Admin from './views/AdminPage.vue'
 import MyActivities from './views/MyActivitiesPage.vue'
-import { isLoggedIn, hasRole, ensureDefaultAdmin } from './utils/auth.js'
+import { isLoggedIn, hasRole } from './utils/auth.js'
 
 const routes = [
   { path: '/', component: Home },
@@ -55,7 +55,6 @@ router.beforeEach((to, from, next) => {
 initializeSecurity()
 initializeAppSecurity()
 
-ensureDefaultAdmin()
 const app = createApp(App)
 app.use(router)
 app.mount('#app')

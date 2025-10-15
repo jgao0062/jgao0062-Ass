@@ -1,6 +1,14 @@
-// Lightweight local auth and security helpers
+// Firebase Authentication integration
 // BR (C.4): Enhanced Security - XSS Protection and Authentication Security
 
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile
+} from 'firebase/auth'
+import { auth } from '../config/firebase.js'
 import {
   sanitizeInput,
   sanitizeEmail,
@@ -65,17 +73,11 @@ export function findUserByEmail(email) {
 }
 
 export async function registerUser({ firstName, lastName, email, password, role = 'user' }) {
-  const users = getAllUsers()
   const safeEmail = sanitizeEmail(email)
 
   if (!safeEmail) {
     securityLog('warning', 'Registration attempt with invalid email', { email })
     return { ok: false, message: 'Invalid email format' }
-  }
-
-  if (users.some(u => u.email === safeEmail)) {
-    securityLog('info', 'Registration attempt with existing email', { email: safeEmail })
-    return { ok: false, message: 'Email already registered' }
   }
 
   // Validate password strength
@@ -84,22 +86,64 @@ export async function registerUser({ firstName, lastName, email, password, role 
     return { ok: false, message: 'Password must be at least 8 characters long' }
   }
 
-  const hashed = await hashString(password || '')
-  const user = {
-    id: Date.now(),
-    firstName: sanitizeInput(firstName),
-    lastName: sanitizeInput(lastName),
-    email: safeEmail,
-    passwordHash: hashed,
-    role,
-    createdAt: new Date().toISOString(),
-    lastLogin: null
-  }
-  users.push(user)
-  writeJSON(USERS_KEY, users)
+  try {
+    // Create user with Firebase Authentication
+    const userCredential = await createUserWithEmailAndPassword(auth, safeEmail, password)
+    const user = userCredential.user
 
-  securityLog('info', 'User registered successfully', { userId: user.id, email: safeEmail, role })
-  return { ok: true, user }
+    // Update user profile with display name
+    await updateProfile(user, {
+      displayName: `${sanitizeInput(firstName)} ${sanitizeInput(lastName)}`
+    })
+
+    // Store additional user data in localStorage for local features
+    const userData = {
+      id: user.uid,
+      firstName: sanitizeInput(firstName),
+      lastName: sanitizeInput(lastName),
+      email: safeEmail,
+      role,
+      createdAt: new Date().toISOString(),
+      lastLogin: null
+    }
+
+    // Save user data locally for compatibility with existing features
+    const users = getAllUsers()
+    users.push(userData)
+    writeJSON(USERS_KEY, users)
+
+    securityLog('info', 'User registered successfully with Firebase', {
+      userId: user.uid,
+      email: safeEmail,
+      role
+    })
+
+    return { ok: true, user: userData, firebaseUser: user }
+  } catch (error) {
+    let errorMessage = 'Registration failed'
+
+    switch (error.code) {
+      case 'auth/email-already-in-use':
+        errorMessage = 'Email already registered'
+        break
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid email format'
+        break
+      case 'auth/weak-password':
+        errorMessage = 'Password is too weak'
+        break
+      default:
+        errorMessage = error.message
+    }
+
+    securityLog('error', 'Firebase registration failed', {
+      email: safeEmail,
+      error: error.code,
+      message: errorMessage
+    })
+
+    return { ok: false, message: errorMessage }
+  }
 }
 
 export async function login(email, password) {
@@ -115,45 +159,81 @@ export async function login(email, password) {
     return { ok: false, message: 'Too many login attempts. Please try again later.' }
   }
 
-  const user = findUserByEmail(email)
-  if (!user) {
-    securityLog('warning', 'Login attempt with non-existent email', { email: safeEmail })
-    return { ok: false, message: 'Invalid credentials' }
-  }
+  try {
+    // Sign in with Firebase Authentication
+    const userCredential = await signInWithEmailAndPassword(auth, safeEmail, password)
+    const user = userCredential.user
 
-  const hashed = await hashString(password || '')
-  if (user.passwordHash !== hashed) {
-    securityLog('warning', 'Login attempt with incorrect password', { email: safeEmail, userId: user.id })
-    return { ok: false, message: 'Invalid credentials' }
-  }
+    // Get user data from local storage
+    const localUser = findUserByEmail(safeEmail)
 
-  // Update last login time
-  const users = getAllUsers()
-  const userIndex = users.findIndex(u => u.id === user.id)
-  if (userIndex !== -1) {
-    users[userIndex].lastLogin = new Date().toISOString()
-    writeJSON(USERS_KEY, users)
-  }
+    if (localUser) {
+      // Update last login time
+      const users = getAllUsers()
+      const userIndex = users.findIndex(u => u.id === localUser.id)
+      if (userIndex !== -1) {
+        users[userIndex].lastLogin = new Date().toISOString()
+        writeJSON(USERS_KEY, users)
+      }
+    }
 
-  const session = {
-    userId: user.id,
-    role: user.role,
-    email: user.email,
-    firstName: user.firstName,
-    ts: Date.now(),
-    csrfToken: generateCSRFToken()
-  }
-  writeJSON(SESSION_KEY, session)
+    const session = {
+      userId: user.uid,
+      role: localUser?.role || 'user',
+      email: user.email,
+      firstName: localUser?.firstName || '',
+      lastName: localUser?.lastName || '',
+      ts: Date.now(),
+      csrfToken: generateCSRFToken()
+    }
+    writeJSON(SESSION_KEY, session)
 
-  securityLog('info', 'User logged in successfully', { userId: user.id, email: safeEmail })
-  return { ok: true, session }
+    securityLog('info', 'User logged in successfully with Firebase', {
+      userId: user.uid,
+      email: safeEmail
+    })
+
+    return { ok: true, session }
+  } catch (error) {
+    let errorMessage = 'Invalid credentials'
+
+    switch (error.code) {
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid credentials'
+        break
+      case 'auth/too-many-requests':
+        errorMessage = 'Too many failed attempts. Please try again later.'
+        break
+      default:
+        errorMessage = error.message
+    }
+
+    securityLog('warning', 'Firebase login failed', {
+      email: safeEmail,
+      error: error.code,
+      message: errorMessage
+    })
+
+    return { ok: false, message: errorMessage }
+  }
 }
 
-export function logout() {
+export async function logout() {
   const session = getSession()
   if (session) {
     securityLog('info', 'User logged out', { userId: session.userId, email: session.email })
   }
+
+  try {
+    // Sign out from Firebase
+    await signOut(auth)
+  } catch (error) {
+    securityLog('warning', 'Firebase logout error', { error: error.message })
+  }
+
+  // Clear local session
   localStorage.removeItem(SESSION_KEY)
 }
 
@@ -163,6 +243,36 @@ export function getSession() {
 
 export function isLoggedIn() {
   return !!getSession()
+}
+
+// Firebase Authentication state listener
+export function onAuthStateChange(callback) {
+  return onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // User is signed in
+      const localUser = findUserByEmail(user.email)
+      const session = {
+        userId: user.uid,
+        role: localUser?.role || 'user',
+        email: user.email,
+        firstName: localUser?.firstName || '',
+        lastName: localUser?.lastName || '',
+        ts: Date.now(),
+        csrfToken: generateCSRFToken()
+      }
+      writeJSON(SESSION_KEY, session)
+      callback({ user, session })
+    } else {
+      // User is signed out
+      localStorage.removeItem(SESSION_KEY)
+      callback({ user: null, session: null })
+    }
+  })
+}
+
+// Get current Firebase user
+export function getCurrentFirebaseUser() {
+  return auth.currentUser
 }
 
 export function hasRole(requiredRole) {
@@ -199,14 +309,40 @@ export async function updateAdminCredentials() {
 export async function ensureDefaultAdmin() {
   const users = getAllUsers()
   const hasAdmin = users.some(u => u.role === 'admin')
+
   if (hasAdmin) {
     // Update existing admin credentials
     await updateAdminCredentials()
     return
   }
+
   const email = 'admin@gmail.com'
-  if (!users.some(u => u.email === email)) {
-    await registerUser({ firstName: 'Admin', lastName: 'User', email, password: 'Admin1234', role: 'admin' })
+  const password = 'Admin1234'
+
+  // Check if admin already exists in Firebase
+  try {
+    await signInWithEmailAndPassword(auth, email, password)
+    // If login succeeds, admin exists in Firebase
+    securityLog('info', 'Admin user already exists in Firebase')
+    return
+  } catch (error) {
+    if (error.code === 'auth/user-not-found') {
+      // Admin doesn't exist in Firebase, create it
+      try {
+        await registerUser({
+          firstName: 'Admin',
+          lastName: 'User',
+          email,
+          password,
+          role: 'admin'
+        })
+        securityLog('info', 'Default admin user created in Firebase')
+      } catch (regError) {
+        securityLog('error', 'Failed to create default admin', { error: regError.message })
+      }
+    } else {
+      securityLog('warning', 'Error checking admin user', { error: error.message })
+    }
   }
 }
 
