@@ -350,6 +350,19 @@
                   </div>
                 </div>
               </div>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label">Difficulty</label>
+                    <select class="form-select" v-model="programForm.difficulty" required>
+                      <option value="">Select Difficulty</option>
+                      <option value="Beginner">Beginner</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Advanced">Advanced</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
               <div v-if="programError" class="alert alert-danger">{{ programError }}</div>
               <div v-if="programSuccess" class="alert alert-success">{{ programSuccess }}</div>
             </form>
@@ -425,7 +438,8 @@ export default {
       participants: 0,
       description: '',
       schedule: '',
-      location: ''
+      location: '',
+      difficulty: ''
     })
 
     const loadData = async () => {
@@ -788,7 +802,8 @@ export default {
         participants: 0,
         description: '',
         schedule: '',
-        location: ''
+        location: '',
+        difficulty: ''
       }
       programError.value = ''
       programSuccess.value = ''

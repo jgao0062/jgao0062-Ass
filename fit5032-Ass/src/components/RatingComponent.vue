@@ -21,7 +21,8 @@
     <!-- User Rating Input -->
     <div class="user-rating" v-if="showUserRating && !isAdmin">
       <div class="mb-2">
-        <small class="text-muted" v-if="session">Your rating:</small>
+        <small class="text-muted" v-if="session && hasJoinedProgram">Your rating:</small>
+        <small class="text-muted" v-else-if="session && !hasJoinedProgram">Join program to rate:</small>
         <small class="text-muted" v-else>Please login to rate</small>
         <small class="text-info" v-if="session">(Logged in as: {{ session.firstName || session.email }})</small>
       </div>
@@ -34,10 +35,16 @@
           class="fas fa-star rating-star"
           :class="{
             'text-warning': star <= userRating,
-            'text-muted': star > userRating
+            'text-muted': star > userRating,
+            'rating-disabled': !hasJoinedProgram
           }"
-          @click="setRating(star)"
-          style="cursor: pointer; font-size: 1.5rem; margin-right: 5px;"
+          @click="hasJoinedProgram ? setRating(star) : null"
+          :style="{
+            cursor: hasJoinedProgram ? 'pointer' : 'not-allowed',
+            fontSize: '1.5rem',
+            marginRight: '5px',
+            opacity: hasJoinedProgram ? 1 : 0.5
+          }"
         ></i>
       </div>
 
@@ -50,8 +57,12 @@
           <i class="fas fa-check-circle me-1"></i>
           Rating saved: {{ userRating }} stars
         </small>
-        <small v-else-if="session && !isAdmin" class="text-muted">
-          Click stars or buttons to rate
+        <small v-else-if="session && hasJoinedProgram && !isAdmin" class="text-muted">
+          Click stars to rate this program
+        </small>
+        <small v-else-if="session && !hasJoinedProgram && !isAdmin" class="text-warning">
+          <i class="fas fa-info-circle me-1"></i>
+          You must join this program before you can rate it
         </small>
         <small v-else-if="isAdmin" class="text-info">
           <i class="fas fa-info-circle me-1"></i>
@@ -71,7 +82,8 @@ import { getSession } from '../utils/auth.js'
 import { 
   addRating, 
   userHasRated, 
-  getProgramAverageRating 
+  getProgramAverageRating,
+  userHasJoinedProgram
 } from '../services/userService.js'
 import { securityLog, sanitizeNumber } from '../utils/security.js'
 
@@ -97,6 +109,7 @@ export default {
     const session = ref(getSession())
     const averageRating = ref(0)
     const totalRatings = ref(0)
+    const hasJoinedProgram = ref(false)
 
     // Check if current user is admin
     const isAdmin = computed(() => {
@@ -111,8 +124,11 @@ export default {
         averageRating.value = ratingData.average
         totalRatings.value = ratingData.count
 
-        // Check if current user has rated
+        // Check if current user has joined the program
         if (session.value) {
+          hasJoinedProgram.value = await userHasJoinedProgram(session.value.userId, props.programId)
+          
+          // Check if current user has rated
           const hasRated = await userHasRated(props.programId, session.value.userId)
           if (hasRated) {
             // Get user's rating from Firebase
@@ -157,6 +173,12 @@ export default {
         return
       }
 
+      // Check if user has joined the program
+      if (!hasJoinedProgram.value) {
+        validationError.value = 'You must join this program before you can rate it'
+        return
+      }
+
       try {
         const result = await addRating(props.programId, session.value.userId, sanitizedRating)
         
@@ -198,6 +220,7 @@ export default {
       totalRatings,
       session,
       isAdmin,
+      hasJoinedProgram,
       setRating
     }
   }
@@ -220,6 +243,14 @@ export default {
 
 .rating-star:hover {
   color: #ffc107 !important;
+}
+
+.rating-disabled {
+  pointer-events: none;
+}
+
+.rating-disabled:hover {
+  color: inherit !important;
 }
 
 .average-rating {

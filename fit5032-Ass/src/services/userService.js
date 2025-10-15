@@ -571,6 +571,35 @@ export async function userHasRated(programId, userId) {
 }
 
 /**
+ * Check if user has joined a program
+ * @param {string} userId - User ID
+ * @param {string} programId - Program ID
+ * @returns {Promise<boolean>} True if user has joined the program
+ */
+export async function userHasJoinedProgram(userId, programId) {
+  try {
+    const userIdStr = String(userId)
+    const programIdStr = String(programId)
+    
+    const q = query(
+      collection(db, ACTIVITIES_COLLECTION),
+      where('userId', '==', userIdStr),
+      where('programId', '==', programIdStr)
+    )
+
+    const querySnapshot = await getDocs(q)
+    return !querySnapshot.empty
+  } catch (error) {
+    securityLog('error', 'Failed to check if user joined program', {
+      userId,
+      programId,
+      error: error.message
+    })
+    return false
+  }
+}
+
+/**
  * Add or update a rating for a program
  * @param {string} programId - Program ID
  * @param {string} userId - User ID
@@ -588,6 +617,15 @@ export async function addRating(programId, userId, value) {
     // Ensure programId is string for Firebase consistency
     const programIdStr = String(programId)
     const userIdStr = String(userId)
+
+    // Check if user has joined the program
+    const hasJoined = await userHasJoinedProgram(userIdStr, programIdStr)
+    if (!hasJoined) {
+      return {
+        success: false,
+        message: 'You must join this program before you can rate it'
+      }
+    }
 
     // Check if user has already rated this program
     const q = query(
@@ -975,15 +1013,11 @@ export async function addProgram(programData) {
       description: programData.description,
       location: programData.location,
       schedule: programData.schedule || '',
-      duration: programData.duration || '',
       maxParticipants: programData.maxParticipants || 20,
       participants: 0,
       price: programData.price || 0,
       category: programData.category || 'General',
       difficulty: programData.difficulty || 'Beginner',
-      instructor: programData.instructor || '',
-      requirements: programData.requirements || '',
-      image: programData.image || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
