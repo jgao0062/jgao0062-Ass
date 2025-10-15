@@ -71,11 +71,20 @@
                     <td>{{ user.firstName }} {{ user.lastName }}</td>
                     <td>{{ user.email }}</td>
                     <td><span class="badge" :class="user.role === 'admin' ? 'bg-danger' : 'bg-primary'">{{ user.role }}</span></td>
-                    <td>{{ formatDate(user.id) }}</td>
+                    <td>{{ formatDate(user.createdAt) }}</td>
                     <td>
                       <button
+                        class="btn btn-sm me-1"
+                        :class="user.role === 'admin' ? 'btn-outline-warning' : 'btn-outline-success'"
+                        @click="toggleUserRole(user.id, user.role)"
+                        :disabled="user.id === session?.userId"
+                        :title="user.role === 'admin' ? 'Demote to user' : 'Promote to admin'"
+                      >
+                        <i :class="user.role === 'admin' ? 'fas fa-user-minus' : 'fas fa-user-plus'"></i>
+                      </button>
+                      <button
                         class="btn btn-sm btn-outline-danger"
-                        @click="deleteUser(user.id)"
+                        @click="deleteUserHandler(user.id)"
                         :disabled="user.id === session?.userId"
                         title="Cannot delete yourself"
                       >
@@ -129,9 +138,14 @@
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Program Management</h5>
-            <button class="btn btn-sm btn-success" @click="showAddProgram = true">
-              <i class="fas fa-plus me-1"></i>Add Program
-            </button>
+            <div>
+              <button class="btn btn-sm btn-outline-primary me-2" @click="refreshData" :disabled="loading">
+                <i class="fas fa-sync-alt me-1" :class="{ 'fa-spin': loading }"></i>Refresh
+              </button>
+              <button class="btn btn-sm btn-success" @click="showAddProgram = true">
+                <i class="fas fa-plus me-1"></i>Add Program
+              </button>
+            </div>
           </div>
           <div class="card-body">
             <div class="table-responsive">
@@ -159,14 +173,14 @@
                         {{ program.price }}
                       </span>
                     </td>
-                    <td>{{ program.participants }}</td>
+                    <td>{{ program.actualParticipants || 0 }}</td>
                     <td>
-                      <span class="badge bg-warning">{{ getProgramRating(program.id).average }}/5</span>
+                      <span class="badge bg-warning">{{ getProgramRatingDisplay(program.id).average }}/5</span>
                     </td>
-                    <td>{{ getProgramRating(program.id).count }}</td>
+                    <td>{{ getProgramRatingDisplay(program.id).count }}</td>
                     <td>
                       <div class="progress" style="height: 20px;">
-                        <div class="progress-bar" :style="{ width: (getProgramRating(program.id).average / 5 * 100) + '%' }"></div>
+                        <div class="progress-bar" :style="{ width: (getProgramRatingDisplay(program.id).average / 5 * 100) + '%' }"></div>
                       </div>
                     </td>
                     <td>
@@ -356,17 +370,37 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { getSession, getAllUsers, getRatings, registerUser, deleteUser as deleteUserAuth, getProgramAverageRating } from '../utils/auth.js'
+import { getSession, registerUser } from '../utils/auth.js'
+import { 
+  getAllUsers,
+  getAllUserRegistrations, 
+  getAllPrograms, 
+  addProgram, 
+  updateProgram, 
+  deleteProgram,
+  getAllActivities,
+  getProgramAverageRating,
+  deleteUser,
+  updateUserRole
+} from '../services/userService.js'
 import { programsData } from '../data/programs.js'
 
 export default {
   name: 'AdminPage',
   setup() {
     const session = getSession()
+    
+    // Check if user is admin
+    if (!session || session.role !== 'admin') {
+      // Redirect to home page if not admin
+      window.location.href = '/'
+      return
+    }
     const users = ref([])
     const registrations = ref([])
     const ratings = ref({})
     const programs = ref([])
+    const loading = ref(false)
     const showCreateAdmin = ref(false)
     const creatingAdmin = ref(false)
     const createAdminError = ref('')
@@ -394,26 +428,134 @@ export default {
       location: ''
     })
 
-    const loadData = () => {
-      users.value = getAllUsers()
-      registrations.value = JSON.parse(localStorage.getItem('registrations') || '[]')
-      ratings.value = getRatings()
-      programs.value = [...programsData]
+    const loadData = async () => {
+      loading.value = true
+      try {
+        console.log('Loading admin data...')
+        
+        // Load users from Firebase
+        const usersResult = await getAllUsers()
+        if (usersResult.success) {
+          users.value = usersResult.data
+          console.log('Users loaded:', users.value.length)
+        }
+
+        // Load registrations from Firebase
+        const registrationsResult = await getAllUserRegistrations()
+        if (registrationsResult.success) {
+          registrations.value = registrationsResult.data
+          console.log('Registrations loaded:', registrations.value.length)
+        }
+
+        // Load programs from Firebase
+        const programsResult = await getAllPrograms()
+        if (programsResult.success) {
+          programs.value = programsResult.data
+          console.log('Programs loaded:', programs.value.length)
+        } else {
+          // Fallback to local data if Firebase fails
+          programs.value = [...programsData]
+          console.log('Using fallback programs data:', programs.value.length)
+        }
+
+        // Load activities for stats and participant counts
+        const activitiesResult = await getAllActivities()
+        if (activitiesResult.success) {
+          console.log('Activities loaded:', activitiesResult.data.length)
+          // Calculate actual participant counts for each program
+          const participantCounts = {}
+          activitiesResult.data.forEach(activity => {
+            const programId = activity.programId
+            if (!participantCounts[programId]) {
+              participantCounts[programId] = 0
+            }
+            participantCounts[programId]++
+          })
+          
+          // Update programs with actual participant counts
+          programs.value = programs.value.map(program => ({
+            ...program,
+            actualParticipants: participantCounts[program.id] || 0
+          }))
+          
+          console.log('Participant counts calculated:', participantCounts)
+        }
+
+        // Load ratings data
+        await loadRatingsData()
+        
+      } catch (error) {
+        console.error('Error loading admin data:', error)
+        // Fallback to local data
+        programs.value = [...programsData]
+        users.value = []
+        registrations.value = []
+        ratings.value = {}
+      } finally {
+        loading.value = false
+      }
+    }
+
+    // Refresh data function
+    const refreshData = async () => {
+      await loadData()
+    }
+
+    // Load ratings data for all programs
+    const loadRatingsData = async () => {
+      try {
+        console.log('Loading ratings data...')
+        const programRatings = {}
+        
+        // Load ratings for each program
+        for (const program of programs.value) {
+          const ratingResult = await getProgramAverageRating(program.id)
+          if (ratingResult) {
+            programRatings[program.id] = {
+              average: ratingResult.average || 0,
+              count: ratingResult.count || 0
+            }
+          } else {
+            programRatings[program.id] = {
+              average: 0,
+              count: 0
+            }
+          }
+        }
+        
+        ratings.value = programRatings
+        console.log('Ratings data loaded:', programRatings)
+      } catch (error) {
+        console.error('Error loading ratings data:', error)
+        ratings.value = {}
+      }
     }
 
     const stats = computed(() => {
       const totalUsers = users.value.length
       const totalRegistrations = registrations.value.length
-      const allRatings = Object.values(ratings.value).flat()
-      const totalRatings = allRatings.length
-      const avgRating = totalRatings > 0 ? allRatings.reduce((sum, r) => sum + r.value, 0) / totalRatings : 0
+      
+      // Calculate total ratings and average from the new ratings structure
+      let totalRatings = 0
+      let totalRatingValue = 0
+      
+      Object.values(ratings.value).forEach(rating => {
+        totalRatings += rating.count || 0
+        totalRatingValue += (rating.average || 0) * (rating.count || 0)
+      })
+      
+      const avgRating = totalRatings > 0 ? totalRatingValue / totalRatings : 0
+      
       return { totalUsers, totalRegistrations, totalRatings, avgRating }
     })
 
     const programRatings = computed(() => {
-      return Object.entries(ratings.value).map(([programId, ratingList]) => {
-        const average = ratingList.length > 0 ? ratingList.reduce((sum, r) => sum + r.value, 0) / ratingList.length : 0
-        return { programId, average: Math.round(average * 10) / 10, count: ratingList.length }
+      return Object.entries(ratings.value).map(([programId, ratingData]) => {
+        return { 
+          programId, 
+          average: Math.round((ratingData.average || 0) * 10) / 10, 
+          count: ratingData.count || 0 
+        }
       })
     })
 
@@ -430,7 +572,7 @@ export default {
     const exportUsers = () => {
       const csv = [
         ['Name', 'Email', 'Role', 'Joined Date'],
-        ...users.value.map(u => [u.firstName + ' ' + u.lastName, u.email, u.role, formatDate(u.id)])
+        ...users.value.map(u => [u.firstName + ' ' + u.lastName, u.email, u.role, formatDate(u.createdAt)])
       ].map(row => row.join(',')).join('\n')
       downloadCSV(csv, 'users.csv')
     }
@@ -503,11 +645,46 @@ export default {
       creatingAdmin.value = false
     }
 
-    const deleteUser = (userId) => {
-      if (confirm('Are you sure you want to delete this user?')) {
-        const result = deleteUserAuth(userId)
-        if (result.ok) {
-          loadData() // Refresh user list
+    const deleteUserHandler = async (userId) => {
+      if (confirm('Are you sure you want to delete this user? This will permanently remove all user data including registrations, activities, and ratings.')) {
+        try {
+          const result = await deleteUser(userId)
+          if (result.success) {
+            // Remove from local array
+            const index = users.value.findIndex(u => u.id === userId)
+            if (index !== -1) {
+              users.value.splice(index, 1)
+            }
+            alert('User deleted successfully!')
+            loadData() // Refresh user list
+          } else {
+            alert('Error deleting user: ' + result.message)
+          }
+        } catch (error) {
+          alert('Error deleting user: ' + error.message)
+        }
+      }
+    }
+
+    const toggleUserRole = async (userId, currentRole) => {
+      const newRole = currentRole === 'admin' ? 'user' : 'admin'
+      const action = newRole === 'admin' ? 'promote to admin' : 'demote to user'
+      
+      if (confirm(`Are you sure you want to ${action} this user?`)) {
+        try {
+          const result = await updateUserRole(userId, newRole)
+          if (result.success) {
+            // Update local array
+            const user = users.value.find(u => u.id === userId)
+            if (user) {
+              user.role = newRole
+            }
+            alert(`User ${action} successfully!`)
+          } else {
+            alert('Error updating user role: ' + result.message)
+          }
+        } catch (error) {
+          alert('Error updating user role: ' + error.message)
         }
       }
     }
@@ -519,16 +696,31 @@ export default {
       showAddProgram.value = true
     }
 
-    const deleteProgram = (programId) => {
-      if (confirm('Are you sure you want to delete this program?')) {
-        const index = programs.value.findIndex(p => p.id === programId)
-        if (index !== -1) {
-          programs.value.splice(index, 1)
-          // In a real app, you would save to backend here
-          programSuccess.value = 'Program deleted successfully'
+    const deleteProgram = async (programId) => {
+      if (confirm('Are you sure you want to delete this program? This will also delete all related ratings and activities.')) {
+        try {
+          const result = await deleteProgram(programId)
+          if (result.success) {
+            // Remove from local array
+            const index = programs.value.findIndex(p => p.id === programId)
+            if (index !== -1) {
+              programs.value.splice(index, 1)
+            }
+            programSuccess.value = result.message
+            setTimeout(() => {
+              programSuccess.value = ''
+            }, 3000)
+          } else {
+            programError.value = result.message
+            setTimeout(() => {
+              programError.value = ''
+            }, 5000)
+          }
+        } catch (error) {
+          programError.value = 'Error deleting program: ' + error.message
           setTimeout(() => {
-            programSuccess.value = ''
-          }, 3000)
+            programError.value = ''
+          }, 5000)
         }
       }
     }
@@ -541,19 +733,31 @@ export default {
       try {
         if (editingProgram.value) {
           // Update existing program
-          const index = programs.value.findIndex(p => p.id === editingProgram.value.id)
-          if (index !== -1) {
-            programs.value[index] = { ...programForm.value, id: editingProgram.value.id }
+          const result = await updateProgram(editingProgram.value.id, programForm.value)
+          if (result.success) {
+            // Update local array
+            const index = programs.value.findIndex(p => p.id === editingProgram.value.id)
+            if (index !== -1) {
+              programs.value[index] = { ...programForm.value, id: editingProgram.value.id }
+            }
+            programSuccess.value = result.message
+          } else {
+            programError.value = result.message
           }
-          programSuccess.value = 'Program updated successfully!'
         } else {
           // Add new program
-          const newProgram = {
-            ...programForm.value,
-            id: Math.max(...programs.value.map(p => p.id)) + 1
+          const result = await addProgram(programForm.value)
+          if (result.success) {
+            // Add to local array
+            const newProgram = {
+              ...programForm.value,
+              id: result.programId
+            }
+            programs.value.push(newProgram)
+            programSuccess.value = result.message
+          } else {
+            programError.value = result.message
           }
-          programs.value.push(newProgram)
-          programSuccess.value = 'Program added successfully!'
         }
 
         // Reset form
@@ -590,7 +794,19 @@ export default {
       programSuccess.value = ''
     }
 
-    // Get program rating data
+    // Get program rating data (synchronous version for template)
+    const getProgramRatingDisplay = (programId) => {
+      const rating = ratings.value[programId]
+      if (rating) {
+        return {
+          average: rating.average || 0,
+          count: rating.count || 0
+        }
+      }
+      return { average: 0, count: 0 }
+    }
+
+    // Get program rating data (async version for loading)
     const getProgramRating = (programId) => {
       return getProgramAverageRating(programId)
     }
@@ -604,6 +820,7 @@ export default {
       users,
       registrations,
       programs,
+      loading,
       stats,
       programRatings,
       programsWithRatings,
@@ -617,7 +834,8 @@ export default {
       createAdminError,
       createAdminSuccess,
       createAdmin,
-      deleteUser,
+      deleteUserHandler,
+      toggleUserRole,
       // Program management
       showAddProgram,
       editingProgram,
@@ -629,7 +847,9 @@ export default {
       deleteProgram,
       saveProgram,
       closeProgramModal,
-      getProgramRating
+      getProgramRating,
+      getProgramRatingDisplay,
+      refreshData
     }
   }
 }

@@ -367,27 +367,7 @@
         return fieldsToValidate.every(field => !errors[field])
       }
 
-            // localStorage utility functions
-      const saveToLocalStorage = (key, data) => {
-        try {
-          localStorage.setItem(key, JSON.stringify(data))
-          console.log(`Saved ${key} to localStorage:`, data)
-          return true
-        } catch (error) {
-          console.error(`Error saving ${key} to localStorage:`, error)
-          return false
-        }
-      }
-
-      const loadFromLocalStorage = (key, defaultValue = null) => {
-        try {
-          const data = localStorage.getItem(key)
-          return data ? JSON.parse(data) : defaultValue
-        } catch (error) {
-          console.error(`Error loading ${key} from localStorage:`, error)
-          return defaultValue
-        }
-      }
+      // localStorage functions removed - now using Firebase only
 
       const submitRegistration = async () => {
         if (!validateForm()) {
@@ -451,15 +431,7 @@
             })
           }
 
-          // Save to localStorage (BR B.2 requirement) - maintain backward compatibility
-          const existingRegistrations = loadFromLocalStorage('registrations', [])
-          existingRegistrations.push(registrationData)
-
-          // Save registration data
-          saveToLocalStorage('registrations', existingRegistrations)
-          saveToLocalStorage('latestRegistration', registrationData)
-
-          // Update participant counts for selected programs
+          // Update participant counts for selected programs (in memory only)
           registration.interestedPrograms.forEach(programName => {
             const program = programsData.find(p => p.name === programName)
             if (program) {
@@ -467,16 +439,7 @@
             }
           })
 
-          // Update and save stats data
-          const currentStats = loadFromLocalStorage('statsData', {
-            totalPrograms: 8,
-            participants: 175,
-            locations: 8,
-            languages: 6
-          })
-          currentStats.participants += 1
-          currentStats.lastUpdated = new Date().toISOString()
-          saveToLocalStorage('statsData', currentStats)
+          // Note: Stats and registration data are now stored in Firebase only
 
           // Reset form
           Object.keys(registration).forEach(key => {
@@ -506,10 +469,10 @@
           })
 
           console.log('Registration completed successfully!')
-          console.log('Data saved to:')
+          console.log('Data saved to Firebase:')
           console.log('- Firebase Authentication:', firebaseUserId)
-          console.log('- Firebase Firestore:', profileResult.success ? 'User Profile [OK]' : 'User Profile [FAIL]', registrationResult.success ? 'Registration Data [OK]' : 'Registration Data [FAIL]')
-          console.log('- Local Storage: [OK]')
+          console.log('- Firebase Firestore User Profile:', profileResult.success ? '[OK]' : '[FAIL]')
+          console.log('- Firebase Firestore Registration Data:', registrationResult.success ? '[OK]' : '[FAIL]')
 
           // Hide success message after 5 seconds
           setTimeout(() => {

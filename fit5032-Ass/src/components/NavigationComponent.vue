@@ -44,7 +44,7 @@
   </template>
 
   <script>
-  import { ref } from 'vue'
+  import { ref, onMounted, onUnmounted } from 'vue'
   import { getSession, logout } from '../utils/auth.js'
 
   export default {
@@ -52,6 +52,34 @@
     setup() {
       const showMobileMenu = ref(false)
       const session = ref(getSession())
+
+      const updateSession = () => {
+        const newSession = getSession()
+        session.value = newSession
+        console.log('Navigation session updated:', newSession) // Debug log
+      }
+
+      const handleUserLoggedIn = () => {
+        console.log('User logged in event received') // Debug log
+        updateSession()
+      }
+
+      const handleUserLoggedOut = () => {
+        console.log('User logged out event received') // Debug log
+        updateSession()
+      }
+
+      onMounted(() => {
+        // Listen for login/logout events
+        window.addEventListener('userLoggedIn', handleUserLoggedIn)
+        window.addEventListener('userLoggedOut', handleUserLoggedOut)
+        console.log('Navigation component mounted, current session:', session.value) // Debug log
+      })
+
+      onUnmounted(() => {
+        window.removeEventListener('userLoggedIn', handleUserLoggedIn)
+        window.removeEventListener('userLoggedOut', handleUserLoggedOut)
+      })
 
       const toggleMobileMenu = () => {
         showMobileMenu.value = !showMobileMenu.value

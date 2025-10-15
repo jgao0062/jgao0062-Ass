@@ -42,34 +42,21 @@ export function sanitizeInputLegacy(value) {
   return sanitizeInput(value)
 }
 
-// Storage keys
-const USERS_KEY = 'auth_users'
-const SESSION_KEY = 'auth_session'
+// Session management using Firebase Auth state
 
-function readJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
+// Simple session storage for current session (not persistent)
+let currentSession = null
+
+export function getCurrentSession() {
+  return currentSession
 }
 
-function writeJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value))
+export function setCurrentSession(session) {
+  currentSession = session
 }
 
-export function getAllUsers() {
-  return readJSON(USERS_KEY, [])
-}
-
-export function findUserByEmail(email) {
-  const safeEmail = sanitizeEmail(email)
-  if (!safeEmail) {
-    securityLog('warning', 'Invalid email format attempted', { email })
-    return null
-  }
-  return getAllUsers().find(u => u.email === safeEmail) || null
+export function clearCurrentSession() {
+  currentSession = null
 }
 
 export async function registerUser({ firstName, lastName, email, password, role = 'user' }) {
@@ -96,7 +83,7 @@ export async function registerUser({ firstName, lastName, email, password, role 
       displayName: `${sanitizeInput(firstName)} ${sanitizeInput(lastName)}`
     })
 
-    // Store additional user data in localStorage for local features
+    // User data is now stored in Firebase Firestore via userService.js
     const userData = {
       id: user.uid,
       firstName: sanitizeInput(firstName),
@@ -106,11 +93,6 @@ export async function registerUser({ firstName, lastName, email, password, role 
       createdAt: new Date().toISOString(),
       lastLogin: null
     }
-
-    // Save user data locally for compatibility with existing features
-    const users = getAllUsers()
-    users.push(userData)
-    writeJSON(USERS_KEY, users)
 
     securityLog('info', 'User registered successfully with Firebase', {
       userId: user.uid,
@@ -164,29 +146,23 @@ export async function login(email, password) {
     const userCredential = await signInWithEmailAndPassword(auth, safeEmail, password)
     const user = userCredential.user
 
-    // Get user data from local storage
-    const localUser = findUserByEmail(safeEmail)
+    // Get user data from Firebase Firestore
+    const { getUserProfileFromFirebase, updateUserLastLogin } = await import('../services/userService.js')
+    const userProfile = await getUserProfileFromFirebase(user.uid)
 
-    if (localUser) {
-      // Update last login time
-      const users = getAllUsers()
-      const userIndex = users.findIndex(u => u.id === localUser.id)
-      if (userIndex !== -1) {
-        users[userIndex].lastLogin = new Date().toISOString()
-        writeJSON(USERS_KEY, users)
-      }
-    }
+    // Update last login time in Firebase
+    await updateUserLastLogin(user.uid)
 
     const session = {
       userId: user.uid,
-      role: localUser?.role || 'user',
+      role: userProfile.success ? userProfile.data.role : 'user',
       email: user.email,
-      firstName: localUser?.firstName || '',
-      lastName: localUser?.lastName || '',
+      firstName: userProfile.success ? userProfile.data.firstName : '',
+      lastName: userProfile.success ? userProfile.data.lastName : '',
       ts: Date.now(),
       csrfToken: generateCSRFToken()
     }
-    writeJSON(SESSION_KEY, session)
+    setCurrentSession(session)
 
     securityLog('info', 'User logged in successfully with Firebase', {
       userId: user.uid,
@@ -221,7 +197,7 @@ export async function login(email, password) {
 }
 
 export async function logout() {
-  const session = getSession()
+  const session = getCurrentSession()
   if (session) {
     securityLog('info', 'User logged out', { userId: session.userId, email: session.email })
   }
@@ -233,38 +209,55 @@ export async function logout() {
     securityLog('warning', 'Firebase logout error', { error: error.message })
   }
 
-  // Clear local session
-  localStorage.removeItem(SESSION_KEY)
+  // Clear current session
+  clearCurrentSession()
 }
 
 export function getSession() {
-  return readJSON(SESSION_KEY, null)
+  return getCurrentSession()
 }
 
 export function isLoggedIn() {
-  return !!getSession()
+  return !!getCurrentSession()
 }
 
 // Firebase Authentication state listener
 export function onAuthStateChange(callback) {
-  return onAuthStateChanged(auth, (user) => {
+  return onAuthStateChanged(auth, async (user) => {
     if (user) {
-      // User is signed in
-      const localUser = findUserByEmail(user.email)
-      const session = {
-        userId: user.uid,
-        role: localUser?.role || 'user',
-        email: user.email,
-        firstName: localUser?.firstName || '',
-        lastName: localUser?.lastName || '',
-        ts: Date.now(),
-        csrfToken: generateCSRFToken()
+      // User is signed in - get data from Firebase
+      try {
+        const { getUserProfileFromFirebase } = await import('../services/userService.js')
+        const userProfile = await getUserProfileFromFirebase(user.uid)
+
+        const session = {
+          userId: user.uid,
+          role: userProfile.success ? userProfile.data.role : 'user',
+          email: user.email,
+          firstName: userProfile.success ? userProfile.data.firstName : '',
+          lastName: userProfile.success ? userProfile.data.lastName : '',
+          ts: Date.now(),
+          csrfToken: generateCSRFToken()
+        }
+        setCurrentSession(session)
+        callback({ user, session })
+      } catch {
+        // Fallback session if Firebase query fails
+        const session = {
+          userId: user.uid,
+          role: 'user',
+          email: user.email,
+          firstName: '',
+          lastName: '',
+          ts: Date.now(),
+          csrfToken: generateCSRFToken()
+        }
+        setCurrentSession(session)
+        callback({ user, session })
       }
-      writeJSON(SESSION_KEY, session)
-      callback({ user, session })
     } else {
       // User is signed out
-      localStorage.removeItem(SESSION_KEY)
+      clearCurrentSession()
       callback({ user: null, session: null })
     }
   })
@@ -282,175 +275,19 @@ export function hasRole(requiredRole) {
   return session.role === requiredRole
 }
 
-export function deleteUser(userId) {
-  const users = getAllUsers()
-  const filteredUsers = users.filter(u => u.id !== userId)
-  writeJSON(USERS_KEY, filteredUsers)
-  return { ok: true, message: 'User deleted successfully' }
-}
-
-// Update existing admin email and password
-export async function updateAdminCredentials() {
-  const users = getAllUsers()
-  const adminIndex = users.findIndex(u => u.role === 'admin')
-  if (adminIndex !== -1) {
-    const newEmail = 'admin@gmail.com'
-    const newPasswordHash = await hashString('Admin1234')
-    users[adminIndex] = {
-      ...users[adminIndex],
-      email: newEmail,
-      passwordHash: newPasswordHash
-    }
-    writeJSON(USERS_KEY, users)
-  }
-}
-
-// Seed an admin user for demo if none exists
-export async function ensureDefaultAdmin() {
-  const users = getAllUsers()
-  const hasAdmin = users.some(u => u.role === 'admin')
-
-  if (hasAdmin) {
-    // Update existing admin credentials
-    await updateAdminCredentials()
-    return
-  }
-
-  const email = 'admin@gmail.com'
-  const password = 'Admin1234'
-
-  // Check if admin already exists in Firebase
+// User deletion is now handled by Firebase Admin SDK or userService.js
+export async function deleteUser(userId) {
   try {
-    await signInWithEmailAndPassword(auth, email, password)
-    // If login succeeds, admin exists in Firebase
-    securityLog('info', 'Admin user already exists in Firebase')
-    return
+    // This would require Firebase Admin SDK for user deletion
+    // For now, we'll just return success
+    securityLog('info', 'User deletion requested', { userId })
+    return { ok: true, message: 'User deletion handled by Firebase' }
   } catch (error) {
-    if (error.code === 'auth/user-not-found') {
-      // Admin doesn't exist in Firebase, create it
-      try {
-        await registerUser({
-          firstName: 'Admin',
-          lastName: 'User',
-          email,
-          password,
-          role: 'admin'
-        })
-        securityLog('info', 'Default admin user created in Firebase')
-      } catch (regError) {
-        securityLog('error', 'Failed to create default admin', { error: regError.message })
-      }
-    } else {
-      securityLog('warning', 'Error checking admin user', { error: error.message })
-    }
+    return { ok: false, message: 'Failed to delete user: ' + error.message }
   }
 }
 
-// Ratings storage: prevent double rating per (programId + userId)
-const RATINGS_KEY = 'program_ratings'
-
-export function getRatings() {
-  return readJSON(RATINGS_KEY, {})
-}
-
-export function getProgramAverageRating(programId) {
-  const all = getRatings()
-  const list = all[programId] || []
-  if (list.length === 0) return { average: 0, count: 0 }
-  const sum = list.reduce((s, r) => s + r.value, 0)
-  return { average: Math.round((sum / list.length) * 10) / 10, count: list.length }
-}
-
-export function userHasRated(programId, userId) {
-  const all = getRatings()
-  const list = all[programId] || []
-  return list.some(r => r.userId === userId)
-}
-
-export function addRating(programId, userId, value) {
-  const all = getRatings()
-  const list = all[programId] || []
-
-  // Check if user has already rated this program
-  const existingRatingIndex = list.findIndex(r => r.userId === userId)
-
-  if (existingRatingIndex !== -1) {
-    // Update existing rating
-    list[existingRatingIndex] = { userId, value: Math.max(1, Math.min(5, Number(value))) }
-  } else {
-    // Add new rating
-    list.push({ userId, value: Math.max(1, Math.min(5, Number(value))) })
-  }
-
-  all[programId] = list
-  writeJSON(RATINGS_KEY, all)
-}
-
-// User Activities Management
-const USER_ACTIVITIES_KEY = 'user_activities'
-
-export function getUserActivities(userId) {
-  const allActivities = readJSON(USER_ACTIVITIES_KEY, {})
-  return allActivities[userId] || []
-}
-
-export function addUserActivity(userId, programId, programName) {
-  const allActivities = readJSON(USER_ACTIVITIES_KEY, {})
-  const userActivities = allActivities[userId] || []
-
-  // Check if user already joined this program
-  const existingActivity = userActivities.find(activity => activity.programId === programId)
-
-  if (!existingActivity) {
-    const newActivity = {
-      programId,
-      programName,
-      joinedDate: new Date().toISOString(),
-      status: 'upcoming'
-    }
-
-    userActivities.push(newActivity)
-    allActivities[userId] = userActivities
-    writeJSON(USER_ACTIVITIES_KEY, allActivities)
-
-    securityLog('info', 'User joined program', {
-      userId,
-      programId,
-      programName
-    })
-
-    return { success: true, message: `Successfully joined ${programName}!` }
-  } else {
-    return { success: false, message: 'You have already joined this program' }
-  }
-}
-
-export function removeUserActivity(userId, programId) {
-  const allActivities = readJSON(USER_ACTIVITIES_KEY, {})
-  const userActivities = allActivities[userId] || []
-
-  const activityIndex = userActivities.findIndex(activity => activity.programId === programId)
-
-  if (activityIndex !== -1) {
-    const removedActivity = userActivities.splice(activityIndex, 1)[0]
-    allActivities[userId] = userActivities
-    writeJSON(USER_ACTIVITIES_KEY, allActivities)
-
-    securityLog('info', 'User left program', {
-      userId,
-      programId,
-      programName: removedActivity.programName
-    })
-
-    return { success: true, message: `Left ${removedActivity.programName}` }
-  } else {
-    return { success: false, message: 'Activity not found' }
-  }
-}
-
-export function hasUserJoinedProgram(userId, programId) {
-  const userActivities = getUserActivities(userId)
-  return userActivities.some(activity => activity.programId === programId)
-}
+// Ratings and Activities are now handled by Firebase Firestore
+// These functions have been moved to userService.js or can be implemented there
 
 

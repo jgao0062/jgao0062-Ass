@@ -21,7 +21,7 @@ import Register from './views/RegisterPage.vue'
 import Login from './views/LoginPage.vue'
 import Admin from './views/AdminPage.vue'
 import MyActivities from './views/MyActivitiesPage.vue'
-import { isLoggedIn, hasRole } from './utils/auth.js'
+import { isLoggedIn, hasRole, onAuthStateChange } from './utils/auth.js'
 
 const routes = [
   { path: '/', component: Home },
@@ -55,6 +55,30 @@ router.beforeEach((to, from, next) => {
 initializeSecurity()
 initializeAppSecurity()
 
+// Initialize Firebase data (run once)
+import { initializeProgramsData } from './utils/initFirebaseData.js'
+
+// Initialize programs data
+initializeProgramsData().then(result => {
+  console.log('Firebase data initialization:', result)
+}).catch(error => {
+  console.error('Firebase initialization error:', error)
+})
+
 const app = createApp(App)
 app.use(router)
+
+// Initialize Firebase authentication state listener
+onAuthStateChange(({ user, session }) => {
+  if (user && session) {
+    console.log('Firebase auth state: User logged in', session)
+    // Trigger login event for components
+    window.dispatchEvent(new CustomEvent('userLoggedIn'))
+  } else {
+    console.log('Firebase auth state: User logged out')
+    // Trigger logout event for components
+    window.dispatchEvent(new CustomEvent('userLoggedOut'))
+  }
+})
+
 app.mount('#app')

@@ -73,7 +73,8 @@
   import { ref, computed, onMounted } from 'vue'
   import ProgramCard from '../components/ProgramCardComponent.vue'
   import { programsData } from '../data/programs.js'
-  import { getSession, addUserActivity } from '../utils/auth.js'
+  import { getSession } from '../utils/auth.js'
+  import { addUserActivity, getAllPrograms } from '../services/userService.js'
 
   export default {
     name: 'ProgramsPage',
@@ -87,10 +88,24 @@
       const selectedPrice = ref('')
       const joinMessage = ref('')
       const joinMessageType = ref('')
+      const programs = ref([...programsData]) // Start with local data, update from Firebase
+
+      // Load programs from Firebase
+      const loadPrograms = async () => {
+        try {
+          const result = await getAllPrograms()
+          if (result.success) {
+            programs.value = result.data
+          }
+        } catch (error) {
+          console.error('Error loading programs from Firebase:', error)
+          // Keep local data as fallback
+        }
+      }
 
       // BR (B.2): Dynamic Data - Filterable programs from data structure
       const filteredPrograms = computed(() => {
-        let filtered = [...programsData]
+        let filtered = [...programs.value]
 
         // Search filter
         if (searchQuery.value) {
@@ -120,7 +135,7 @@
       })
 
       // Handle join program
-      const handleJoinProgram = (program) => {
+      const handleJoinProgram = async (program) => {
         const session = getSession()
 
         if (!session) {
@@ -144,14 +159,24 @@
           return
         }
 
-        const result = addUserActivity(session.userId, program.id, program.name)
+        try {
+          const result = await addUserActivity(session.userId, program.id, program.name)
 
-        if (result.success) {
-          joinMessage.value = result.message
-          joinMessageType.value = 'success'
-        } else {
-          joinMessage.value = result.message
-          joinMessageType.value = 'warning'
+          if (result.success) {
+            joinMessage.value = result.message
+            joinMessageType.value = 'success'
+            
+            // Refresh MyActivities page if it exists
+            if (window.refreshMyActivities) {
+              window.refreshMyActivities()
+            }
+          } else {
+            joinMessage.value = result.message
+            joinMessageType.value = 'warning'
+          }
+        } catch (error) {
+          joinMessage.value = 'Error joining program: ' + error.message
+          joinMessageType.value = 'danger'
         }
 
         // Clear message after 3 seconds
@@ -161,9 +186,10 @@
         }, 3000)
       }
 
-      // Simulate loading when entering the page
-      onMounted(() => {
+      // Load programs when entering the page
+      onMounted(async () => {
         isLoading.value = true
+        await loadPrograms()
         setTimeout(() => {
           isLoading.value = false
         }, 800)

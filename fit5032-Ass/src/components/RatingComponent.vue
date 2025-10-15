@@ -67,14 +67,19 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { getSession, addRating, userHasRated, getProgramAverageRating } from '../utils/auth.js'
+import { getSession } from '../utils/auth.js'
+import { 
+  addRating, 
+  userHasRated, 
+  getProgramAverageRating 
+} from '../services/userService.js'
 import { securityLog, sanitizeNumber } from '../utils/security.js'
 
 export default {
   name: 'RatingComponent',
   props: {
     programId: {
-      type: Number,
+      type: [String, Number],
       required: true
     },
     showUserRating: {
@@ -99,23 +104,34 @@ export default {
     })
 
     // Load current rating data
-    const loadRatingData = () => {
-      const ratingData = getProgramAverageRating(props.programId)
-      averageRating.value = ratingData.average
-      totalRatings.value = ratingData.count
+    const loadRatingData = async () => {
+      try {
+        // Get average rating from Firebase
+        const ratingData = await getProgramAverageRating(props.programId)
+        averageRating.value = ratingData.average
+        totalRatings.value = ratingData.count
 
-      // Check if current user has rated
-      if (session.value) {
-        const hasRated = userHasRated(props.programId, session.value.userId)
-        if (hasRated) {
-          // Find the user's rating
-          const ratings = JSON.parse(localStorage.getItem('program_ratings') || '{}')
-          const programRatings = ratings[props.programId] || []
-          const userRatingData = programRatings.find(r => r.userId === session.value.userId)
-          if (userRatingData) {
-            userRating.value = userRatingData.value
+        // Check if current user has rated
+        if (session.value) {
+          const hasRated = await userHasRated(props.programId, session.value.userId)
+          if (hasRated) {
+            // Get user's rating from Firebase
+            const { getProgramRatings } = await import('../services/userService.js')
+            const ratingsResult = await getProgramRatings(props.programId)
+            if (ratingsResult.success) {
+              const userRatingData = ratingsResult.data.find(r => r.userId === session.value.userId)
+              if (userRatingData) {
+                userRating.value = userRatingData.value
+              }
+            }
           }
         }
+      } catch (error) {
+        console.error('Error loading rating data:', error)
+        securityLog('error', 'Failed to load rating data', {
+          programId: props.programId,
+          error: error.message
+        })
       }
     }
 
@@ -124,7 +140,7 @@ export default {
     })
 
     // Set user rating function
-    const setRating = (rating) => {
+    const setRating = async (rating) => {
       // Validate and sanitize rating input
       const sanitizedRating = sanitizeNumber(rating, 1, 5)
       if (sanitizedRating === null) {
@@ -142,23 +158,28 @@ export default {
       }
 
       try {
-        addRating(props.programId, session.value.userId, sanitizedRating)
-        userRating.value = sanitizedRating
-        validationError.value = ''
+        const result = await addRating(props.programId, session.value.userId, sanitizedRating)
+        
+        if (result.success) {
+          userRating.value = sanitizedRating
+          validationError.value = ''
 
-        // Reload rating data
-        loadRatingData()
+          // Reload rating data
+          await loadRatingData()
 
-        // Emit event to parent component
-        window.dispatchEvent(new CustomEvent('ratingUpdated', {
-          detail: { programId: props.programId, rating: sanitizedRating }
-        }))
+          // Emit event to parent component
+          window.dispatchEvent(new CustomEvent('ratingUpdated', {
+            detail: { programId: props.programId, rating: sanitizedRating }
+          }))
 
-        securityLog('info', 'Rating submitted successfully', {
-          programId: props.programId,
-          userId: session.value.userId,
-          rating: sanitizedRating
-        })
+          securityLog('info', 'Rating submitted successfully', {
+            programId: props.programId,
+            userId: session.value.userId,
+            rating: sanitizedRating
+          })
+        } else {
+          validationError.value = result.message
+        }
       } catch (error) {
         validationError.value = 'Error saving rating: ' + error.message
         securityLog('error', 'Rating submission failed', {

@@ -113,7 +113,8 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { getSession, getUserActivities, removeUserActivity } from '../utils/auth.js'
+import { getSession } from '../utils/auth.js'
+import { getUserActivities, removeUserActivity } from '../services/userService.js'
 
 export default {
   name: 'MyActivitiesPage',
@@ -124,9 +125,25 @@ export default {
     const leaveMessageType = ref('')
 
     // Load user activities
-    const loadActivities = () => {
+    const loadActivities = async () => {
       if (session.value) {
-        userActivities.value = getUserActivities(session.value.userId)
+        try {
+          console.log('Loading activities for user:', session.value.userId)
+          const result = await getUserActivities(session.value.userId)
+          console.log('Activities result:', result)
+          if (result.success) {
+            userActivities.value = result.data
+            console.log('Activities loaded:', userActivities.value)
+          } else {
+            console.error('Failed to load activities:', result.message)
+            userActivities.value = []
+          }
+        } catch (error) {
+          console.error('Error loading activities:', error)
+          userActivities.value = []
+        }
+      } else {
+        console.log('No session found, cannot load activities')
       }
     }
 
@@ -141,16 +158,21 @@ export default {
     }
 
     // Leave program
-    const leaveProgram = (programId, programName) => {
+    const leaveProgram = async (programId, programName) => {
       if (confirm(`Are you sure you want to leave ${programName}?`)) {
-        const result = removeUserActivity(session.value.userId, programId)
+        try {
+          const result = await removeUserActivity(session.value.userId, programId)
 
-        if (result.success) {
-          leaveMessage.value = result.message
-          leaveMessageType.value = 'success'
-          loadActivities() // Refresh activities
-        } else {
-          leaveMessage.value = result.message
+          if (result.success) {
+            leaveMessage.value = result.message
+            leaveMessageType.value = 'success'
+            await loadActivities() // Refresh activities
+          } else {
+            leaveMessage.value = result.message
+            leaveMessageType.value = 'danger'
+          }
+        } catch (error) {
+          leaveMessage.value = 'Error leaving program: ' + error.message
           leaveMessageType.value = 'danger'
         }
 
@@ -174,6 +196,14 @@ export default {
     onMounted(() => {
       loadActivities()
     })
+
+    // Add a method to refresh activities (can be called from other components)
+    const refreshActivities = () => {
+      loadActivities()
+    }
+
+    // Expose refresh method globally for other components to use
+    window.refreshMyActivities = refreshActivities
 
     return {
       session,

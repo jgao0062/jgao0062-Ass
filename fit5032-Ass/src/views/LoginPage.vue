@@ -34,12 +34,15 @@
 
 <script>
 import { ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { login } from '../utils/auth.js'
 import { escapeHtml, securityLog } from '../utils/security.js'
 
 export default {
   name: 'LoginPage',
   setup() {
+    const router = useRouter()
+    const route = useRoute()
     const email = ref('')
     const password = ref('')
     const error = ref('')
@@ -50,8 +53,11 @@ export default {
       submitting.value = true
 
       try {
+        console.log('Attempting login with:', email.value) // Debug log
         const res = await login(email.value, password.value)
         submitting.value = false
+
+        console.log('Login result:', res) // Debug log
 
         if (!res.ok) {
           // Escape error message to prevent XSS
@@ -61,23 +67,24 @@ export default {
         }
 
         securityLog('info', 'User login successful', { email: email.value })
+        console.log('Login successful, session:', res.session) // Debug log
 
         // Trigger login event for other components
         window.dispatchEvent(new CustomEvent('userLoggedIn'))
 
-        // Redirect to intended page or home
-        const params = new URLSearchParams(window.location.search)
-        const redirect = params.get('redirect') || '/'
-
+        // Redirect to intended page or home using Vue Router
+        const redirect = route.query.redirect || '/'
+        
         // Validate redirect URL security
-        if (redirect.startsWith('/') || redirect.startsWith(window.location.origin)) {
-          window.location.replace(redirect)
+        if (redirect.startsWith('/')) {
+          router.push(redirect)
         } else {
-          window.location.replace('/')
+          router.push('/')
         }
       } catch (err) {
         submitting.value = false
         error.value = 'An unexpected error occurred. Please try again.'
+        console.error('Login error:', err) // Debug log
         securityLog('error', 'Login error', { email: email.value, error: err.message })
       }
     }
