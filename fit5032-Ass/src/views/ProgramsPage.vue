@@ -72,7 +72,6 @@
   <script>
   import { ref, computed, onMounted } from 'vue'
   import ProgramCard from '../components/ProgramCardComponent.vue'
-  import { programsData } from '../data/programs.js'
   import { getSession } from '../utils/auth.js'
   import { addUserActivity, getAllPrograms } from '../services/userService.js'
 
@@ -88,18 +87,20 @@
       const selectedPrice = ref('')
       const joinMessage = ref('')
       const joinMessageType = ref('')
-      const programs = ref([...programsData]) // Start with local data, update from Firebase
+      const programs = ref([]) // Start empty, load from Firebase
 
       // Load programs from Firebase
       const loadPrograms = async () => {
         try {
+          isLoading.value = true
           const result = await getAllPrograms()
           if (result.success) {
             programs.value = result.data
           }
         } catch (error) {
           console.error('Error loading programs from Firebase:', error)
-          // Keep local data as fallback
+        } finally {
+          isLoading.value = false
         }
       }
 

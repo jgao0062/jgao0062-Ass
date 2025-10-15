@@ -33,23 +33,40 @@
   
   <script>
   import { ref, onMounted } from 'vue'
-  import { statsData, programsData } from '../data/programs.js'
+  import { getAllPrograms } from '../services/userService.js'
   
   export default {
     name: 'StatsSection',
     setup() {
-      const stats = ref({ ...statsData })
-  
-      // BR (B.2): Dynamic Data - Update stats based on programs data
-      const updateStats = () => {
-        stats.value.totalPrograms = programsData.length
-        stats.value.participants = programsData.reduce((total, program) => total + program.participants, 0)
+      const stats = ref({
+        totalPrograms: 0,
+        participants: 0,
+        locations: 0,
+        languages: 6 // Keep this static as it's not in the programs data
+      })
+
+      // BR (B.2): Dynamic Data - Update stats based on Firebase programs data
+      const updateStats = async () => {
+        try {
+          const result = await getAllPrograms()
+          if (result.success) {
+            const programs = result.data
+            stats.value.totalPrograms = programs.length
+            stats.value.participants = programs.reduce((total, program) => total + (program.participants || 0), 0)
+            
+            // Count unique locations
+            const uniqueLocations = new Set(programs.map(program => program.location))
+            stats.value.locations = uniqueLocations.size
+          }
+        } catch (error) {
+          console.error('Error updating stats:', error)
+        }
       }
-  
+
       onMounted(() => {
         updateStats()
       })
-  
+
       return {
         stats
       }

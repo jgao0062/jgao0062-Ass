@@ -433,7 +433,6 @@ import {
   deleteUser,
   updateUserRole
 } from '../services/userService.js'
-import { programsData } from '../data/programs.js'
 
 export default {
   name: 'AdminPage',
@@ -532,9 +531,9 @@ export default {
           programs.value = programsResult.data
           console.log('Programs loaded:', programs.value.length)
         } else {
-          // Fallback to local data if Firebase fails
-          programs.value = [...programsData]
-          console.log('Using fallback programs data:', programs.value.length)
+          // No fallback data - show empty state
+          programs.value = []
+          console.log('No programs available')
         }
 
         // Load activities for stats and participant counts
@@ -565,8 +564,8 @@ export default {
         
       } catch (error) {
         console.error('Error loading admin data:', error)
-        // Fallback to local data
-        programs.value = [...programsData]
+        // No fallback data - show empty state
+        programs.value = []
         users.value = []
         registrations.value = []
         ratings.value = {}

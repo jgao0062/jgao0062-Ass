@@ -55,15 +55,7 @@ router.beforeEach((to, from, next) => {
 initializeSecurity()
 initializeAppSecurity()
 
-// Initialize Firebase data (run once)
-import { initializeProgramsData } from './utils/initFirebaseData.js'
-
-// Initialize programs data
-initializeProgramsData().then(result => {
-  console.log('Firebase data initialization:', result)
-}).catch(error => {
-  console.error('Firebase initialization error:', error)
-})
+// Firebase data initialization removed - data already exists in Firebase
 
 const app = createApp(App)
 app.use(router)

@@ -31,7 +31,15 @@
       <section class="py-5">
         <div class="container">
           <h2 class="text-center mb-5">Featured Programs</h2>
-          <div class="row">
+          
+          <!-- Loading State -->
+          <div v-if="isLoading" class="text-center py-5">
+            <div class="loading-spinner"></div>
+            <p class="mt-3">Loading programs...</p>
+          </div>
+          
+          <!-- Programs Grid -->
+          <div v-else class="row">
             <ProgramCard
               v-for="program in featuredPrograms"
               :key="program.id"
@@ -53,11 +61,11 @@
   </template>
 
   <script>
-  import { computed, ref } from 'vue'
+  import { computed, ref, onMounted } from 'vue'
   import StatsSection from '../components/StatsSection.vue'
   import ProgramCard from '../components/ProgramCardComponent.vue'
   import ProgramDetailModal from '../components/ProgramDetailModal.vue'
-  import { programsData } from '../data/programs.js'
+  import { getAllPrograms } from '../services/userService.js'
 
   export default {
     name: 'HomePage',
@@ -69,11 +77,28 @@
     setup() {
       const showModal = ref(false)
       const selectedProgram = ref(null)
+      const programs = ref([])
+      const isLoading = ref(true)
 
-      // BR (B.2): Dynamic Data - Featured programs from data structure
+      // Load programs from Firebase
+      const loadPrograms = async () => {
+        try {
+          isLoading.value = true
+          const result = await getAllPrograms()
+          if (result.success) {
+            programs.value = result.data
+          }
+        } catch (error) {
+          console.error('Error loading programs from Firebase:', error)
+        } finally {
+          isLoading.value = false
+        }
+      }
+
+      // BR (B.2): Dynamic Data - Featured programs from Firebase
       const featuredPrograms = computed(() => {
-        return [...programsData]
-          .sort((a, b) => b.participants - a.participants)
+        return [...programs.value]
+          .sort((a, b) => (b.participants || 0) - (a.participants || 0))
           .slice(0, 3)
       })
 
@@ -87,12 +112,17 @@
         selectedProgram.value = null
       }
 
+      onMounted(() => {
+        loadPrograms()
+      })
+
       return {
         featuredPrograms,
         showModal,
         selectedProgram,
         showProgramDetail,
-        closeModal
+        closeModal,
+        isLoading
       }
     }
   }

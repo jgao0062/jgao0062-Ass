@@ -271,12 +271,11 @@
   </template>
 
   <script>
-  import { ref, reactive } from 'vue'
-  import { programsData } from '../data/programs.js'
+  import { ref, reactive, onMounted } from 'vue'
   import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
   import { registerUser } from '../utils/auth.js'
   import { escapeHtml, securityLog } from '../utils/security.js'
-  import { saveUserRegistrationToFirebase, saveUserProfileToFirebase } from '../services/userService.js'
+  import { saveUserRegistrationToFirebase, saveUserProfileToFirebase, getAllPrograms } from '../services/userService.js'
 
 
   export default {
@@ -284,7 +283,23 @@
     setup() {
       const isSubmitting = ref(false)
       const showSuccessMessage = ref(false)
-      const availablePrograms = ref([...programsData])
+      const availablePrograms = ref([])
+
+      // Load programs from Firebase
+      const loadPrograms = async () => {
+        try {
+          const result = await getAllPrograms()
+          if (result.success) {
+            availablePrograms.value = result.data
+          }
+        } catch (error) {
+          console.error('Error loading programs from Firebase:', error)
+        }
+      }
+
+      onMounted(() => {
+        loadPrograms()
+      })
 
       // BR (B.1): Form data structure for dynamic binding
       const registration = reactive({
@@ -433,7 +448,7 @@
 
           // Update participant counts for selected programs (in memory only)
           registration.interestedPrograms.forEach(programName => {
-            const program = programsData.find(p => p.name === programName)
+            const program = availablePrograms.value.find(p => p.name === programName)
             if (program) {
               program.participants += 1
             }
