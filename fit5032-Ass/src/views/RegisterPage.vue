@@ -248,7 +248,10 @@
               <div v-if="showSuccessMessage" class="alert alert-success mt-4">
                 <i class="fas fa-check-circle"></i>
                 <strong>Registration Successful!</strong> Welcome to our community.
-                You'll receive a confirmation email shortly.
+                <br>
+                <small class="text-muted">
+                  <i class="fas fa-database"></i> Your registration data has been saved to Firebase database
+                </small>
               </div>
 
               <!-- Login Link -->
@@ -273,6 +276,7 @@
   import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
   import { registerUser } from '../utils/auth.js'
   import { escapeHtml, securityLog } from '../utils/security.js'
+  import { saveUserRegistrationToFirebase, saveUserProfileToFirebase } from '../services/userService.js'
 
 
   export default {
@@ -392,8 +396,7 @@
 
         isSubmitting.value = true
 
-        // Simulate API call and update dynamic data
-        setTimeout(async () => {
+        try {
           // BR (B.2): Update dynamic data after registration
           const registrationData = {
             ...registration,
@@ -401,7 +404,7 @@
             id: Date.now()
           }
 
-          // Create local auth account (basic auth)
+          // Create Firebase auth account
           const registerResult = await registerUser({
             firstName: registration.firstName,
             lastName: registration.lastName,
@@ -418,7 +421,37 @@
             throw new Error(registerResult.message)
           }
 
-          // Save to localStorage (BR B.2 requirement)
+          const firebaseUserId = registerResult.firebaseUser.uid
+
+          // Save user basic information to Firebase database
+          const profileResult = await saveUserProfileToFirebase({
+            firstName: registration.firstName,
+            lastName: registration.lastName,
+            email: registration.email,
+            phone: registration.phone,
+            age: registration.age,
+            language: registration.language,
+            role: 'user'
+          }, firebaseUserId)
+
+          if (!profileResult.success) {
+            securityLog('warning', 'Failed to save user profile to Firebase', {
+              userId: firebaseUserId,
+              error: profileResult.message
+            })
+          }
+
+          // Save complete registration data to Firebase database
+          const registrationResult = await saveUserRegistrationToFirebase(registrationData, firebaseUserId)
+
+          if (!registrationResult.success) {
+            securityLog('warning', 'Failed to save registration data to Firebase', {
+              userId: firebaseUserId,
+              error: registrationResult.message
+            })
+          }
+
+          // Save to localStorage (BR B.2 requirement) - maintain backward compatibility
           const existingRegistrations = loadFromLocalStorage('registrations', [])
           existingRegistrations.push(registrationData)
 
@@ -466,17 +499,34 @@
           showSuccessMessage.value = true
 
           securityLog('info', 'Registration completed successfully', {
-            userId: registerResult.user.id,
-            email: registration.email
+            userId: firebaseUserId,
+            email: registration.email,
+            firebaseProfileSaved: profileResult.success,
+            firebaseRegistrationSaved: registrationResult.success
           })
-          console.log('Registration completed and saved to localStorage!')
-          console.log('Check localStorage in DevTools under Application > Storage > Local Storage')
+
+          console.log('Registration completed successfully!')
+          console.log('Data saved to:')
+          console.log('- Firebase Authentication:', firebaseUserId)
+          console.log('- Firebase Firestore:', profileResult.success ? 'User Profile [OK]' : 'User Profile [FAIL]', registrationResult.success ? 'Registration Data [OK]' : 'Registration Data [FAIL]')
+          console.log('- Local Storage: [OK]')
 
           // Hide success message after 5 seconds
           setTimeout(() => {
             showSuccessMessage.value = false
           }, 5000)
-        }, 2000)
+
+        } catch (error) {
+          isSubmitting.value = false
+          securityLog('error', 'Registration process failed', {
+            email: registration.email,
+            error: error.message
+          })
+
+          // Display error message to user
+          alert('Registration failed: ' + error.message)
+          console.error('Registration failed:', error)
+        }
       }
 
       return {
