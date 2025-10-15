@@ -164,7 +164,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="program in programs" :key="program.id">
+                  <tr v-for="program in paginatedPrograms" :key="program.id">
                     <td>{{ program.id }}</td>
                     <td>{{ program.name }}</td>
                     <td>{{ program.category }}</td>
@@ -187,13 +187,50 @@
                       <button class="btn btn-sm btn-outline-primary me-1" @click="editProgram(program)">
                         <i class="fas fa-edit"></i>
                       </button>
-                      <button class="btn btn-sm btn-outline-danger" @click="deleteProgram(program.id)">
+                      <button class="btn btn-sm btn-outline-danger" @click="deleteProgramHandler(program.id)">
                         <i class="fas fa-trash"></i>
                       </button>
                     </td>
                   </tr>
                 </tbody>
               </table>
+            </div>
+            
+            <!-- Pagination Controls -->
+            <div class="d-flex justify-content-between align-items-center mt-3" v-if="totalPages > 1">
+              <div class="text-muted">
+                Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, sortedPrograms.length) }} of {{ sortedPrograms.length }} programs
+              </div>
+              <nav>
+                <ul class="pagination pagination-sm mb-0 custom-pagination">
+                  <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <button class="page-link" @click="goToFirstPage" :disabled="currentPage === 1">
+                      <i class="fas fa-angle-double-left"></i>
+                    </button>
+                  </li>
+                  <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                    <button class="page-link" @click="goToPreviousPage" :disabled="currentPage === 1">
+                      <i class="fas fa-angle-left"></i>
+                    </button>
+                  </li>
+                  
+                  <!-- Page numbers -->
+                  <li v-for="page in getVisiblePages()" :key="page" class="page-item" :class="{ active: page === currentPage }">
+                    <button class="page-link" @click="goToPage(page)">{{ page }}</button>
+                  </li>
+                  
+                  <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                    <button class="page-link" @click="goToNextPage" :disabled="currentPage === totalPages">
+                      <i class="fas fa-angle-right"></i>
+                    </button>
+                  </li>
+                  <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                    <button class="page-link" @click="goToLastPage" :disabled="currentPage === totalPages">
+                      <i class="fas fa-angle-double-right"></i>
+                    </button>
+                  </li>
+                </ul>
+              </nav>
             </div>
           </div>
         </div>
@@ -382,7 +419,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getSession, registerUser } from '../utils/auth.js'
 import { 
   getAllUsers,
@@ -441,6 +478,34 @@ export default {
       location: '',
       difficulty: ''
     })
+
+    // Pagination states
+    const currentPage = ref(1)
+    const itemsPerPage = ref(10)
+    const totalPages = ref(1)
+
+    // Computed properties for sorting and pagination
+    const sortedPrograms = computed(() => {
+      return [...programs.value].sort((a, b) => {
+        // Sort by ID in ascending order
+        return parseInt(a.id) - parseInt(b.id)
+      })
+    })
+
+    const paginatedPrograms = computed(() => {
+      const startIndex = (currentPage.value - 1) * itemsPerPage.value
+      const endIndex = startIndex + itemsPerPage.value
+      return sortedPrograms.value.slice(startIndex, endIndex)
+    })
+
+    // Update total pages when programs change
+    watch(sortedPrograms, (newPrograms) => {
+      totalPages.value = Math.ceil(newPrograms.length / itemsPerPage.value)
+      // Reset to first page if current page is out of range
+      if (currentPage.value > totalPages.value && totalPages.value > 0) {
+        currentPage.value = 1
+      }
+    }, { immediate: true })
 
     const loadData = async () => {
       loading.value = true
@@ -710,7 +775,7 @@ export default {
       showAddProgram.value = true
     }
 
-    const deleteProgram = async (programId) => {
+    const deleteProgramHandler = async (programId) => {
       if (confirm('Are you sure you want to delete this program? This will also delete all related ratings and activities.')) {
         try {
           const result = await deleteProgram(programId)
@@ -826,6 +891,46 @@ export default {
       return getProgramAverageRating(programId)
     }
 
+    // Pagination functions
+    const goToPage = (page) => {
+      if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page
+      }
+    }
+
+    const goToFirstPage = () => goToPage(1)
+    const goToLastPage = () => goToPage(totalPages.value)
+    const goToPreviousPage = () => goToPage(currentPage.value - 1)
+    const goToNextPage = () => goToPage(currentPage.value + 1)
+
+    // Get visible page numbers for pagination
+    const getVisiblePages = () => {
+      const pages = []
+      const maxVisible = 5 // Show maximum 5 page numbers
+      
+      if (totalPages.value <= maxVisible) {
+        // Show all pages if total pages is less than max visible
+        for (let i = 1; i <= totalPages.value; i++) {
+          pages.push(i)
+        }
+      } else {
+        // Show pages around current page
+        let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2))
+        let end = Math.min(totalPages.value, start + maxVisible - 1)
+        
+        // Adjust start if we're near the end
+        if (end - start + 1 < maxVisible) {
+          start = Math.max(1, end - maxVisible + 1)
+        }
+        
+        for (let i = start; i <= end; i++) {
+          pages.push(i)
+        }
+      }
+      
+      return pages
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -859,15 +964,81 @@ export default {
       programSuccess,
       programForm,
       editProgram,
-      deleteProgram,
+      deleteProgramHandler,
       saveProgram,
       closeProgramModal,
       getProgramRating,
       getProgramRatingDisplay,
-      refreshData
+      refreshData,
+      // Pagination
+      currentPage,
+      itemsPerPage,
+      totalPages,
+      sortedPrograms,
+      paginatedPrograms,
+      goToPage,
+      goToFirstPage,
+      goToLastPage,
+      goToPreviousPage,
+      goToNextPage,
+      getVisiblePages
     }
   }
 }
 </script>
+
+<style scoped>
+/* Custom pagination styles to match dark theme */
+.custom-pagination .page-link {
+  background-color: #2d3748;
+  border: 1px solid #4a5568;
+  color: #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.custom-pagination .page-link:hover {
+  background-color: #4a5568;
+  border-color: #718096;
+  color: #ffffff;
+}
+
+.custom-pagination .page-item.active .page-link {
+  background-color: #3182ce;
+  border-color: #3182ce;
+  color: #ffffff;
+}
+
+.custom-pagination .page-item.disabled .page-link {
+  background-color: #1a202c;
+  border-color: #2d3748;
+  color: #718096;
+  cursor: not-allowed;
+}
+
+.custom-pagination .page-item.disabled .page-link:hover {
+  background-color: #1a202c;
+  border-color: #2d3748;
+  color: #718096;
+}
+
+/* Pagination container styling */
+.custom-pagination {
+  background-color: #2d3748;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.custom-pagination .page-item:not(:last-child) {
+  margin-right: 0.25rem;
+}
+
+/* Info text styling */
+.text-muted {
+  color: #a0aec0 !important;
+  font-size: 0.875rem;
+}
+</style>
 
 
