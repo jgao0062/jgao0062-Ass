@@ -52,36 +52,122 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Dark theme overrides for Bootstrap */
+  /* Dark theme overrides for Bootstrap - Enhanced for WCAG 2.1 AA compliance */
   .navbar {
     background-color: var(--bg-secondary) !important;
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   }
 
-  .navbar-light .navbar-nav .nav-link {
-    color: var(--text-primary) !important;
-    font-weight: 500;
-    font-size: 1rem;
+  .navbar-light .navbar-nav .nav-link,
+  .navbar .navbar-nav .nav-link,
+  .nav-link {
+    color: #ffffff !important; /* Pure white for maximum contrast */
+    font-weight: 600 !important; /* Increased font weight for better visibility */
+    font-size: 1rem !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important; /* Enhanced text shadow */
+    transition: all 0.3s ease !important;
+    padding: 0.75rem 1rem !important; /* Increased padding for better touch targets */
   }
 
-  .navbar-light .navbar-nav .nav-link:hover {
-    color: var(--primary-color) !important;
-    font-weight: 600;
+  .navbar-light .navbar-nav .nav-link:hover,
+  .navbar-light .navbar-nav .nav-link:focus,
+  .navbar .navbar-nav .nav-link:hover,
+  .navbar .navbar-nav .nav-link:focus,
+  .nav-link:hover,
+  .nav-link:focus {
+    color: #60a5fa !important; /* Light blue with high contrast */
+    font-weight: 700 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  .navbar-light .navbar-nav .nav-link.active,
+  .navbar .navbar-nav .nav-link.active,
+  .nav-link.active {
+    color: #3b82f6 !important; /* Medium blue for active state */
+    font-weight: 700 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
   }
 
   .navbar-light .navbar-toggler {
-    border-color: var(--border-color);
+    border-color: #ffffff; /* White border for better visibility */
+    border-width: 2px;
+  }
+
+  .navbar-light .navbar-toggler:focus {
+    box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.25);
   }
 
   .navbar-light .navbar-toggler-icon {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28248, 250, 252, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 1%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='3' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
   }
 
   .navbar-brand {
-    font-weight: bold;
-    color: var(--primary-color) !important;
-    text-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    font-weight: 800; /* Increased font weight */
+    color: #60a5fa !important; /* Light blue for high contrast */
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7); /* Enhanced text shadow */
+    font-size: 1.25rem; /* Slightly larger font size */
+    transition: all 0.3s ease;
+  }
+
+  .navbar-brand:hover {
+    color: #3b82f6 !important; /* Darker blue on hover */
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+    transform: translateY(-1px);
+  }
+
+  /* Dropdown menu enhancements */
+  .navbar .dropdown-menu {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+  }
+
+  .navbar .dropdown-item {
+    color: #ffffff !important; /* Pure white for maximum contrast */
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .navbar .dropdown-item:hover,
+  .navbar .dropdown-item:focus {
+    background-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    transform: translateX(5px);
+  }
+
+  .navbar .dropdown-divider {
+    border-color: var(--border-color);
+    margin: 0.5rem 0;
+  }
+
+  /* Force high contrast for all navbar links - highest priority */
+  nav.navbar a,
+  nav.navbar .nav-link,
+  nav.navbar .navbar-nav .nav-link,
+  .navbar a,
+  .navbar .nav-link,
+  .navbar .navbar-nav .nav-link {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
+  }
+
+  nav.navbar a:hover,
+  nav.navbar .nav-link:hover,
+  nav.navbar .navbar-nav .nav-link:hover,
+  .navbar a:hover,
+  .navbar .nav-link:hover,
+  .navbar .navbar-nav .nav-link:hover {
+    color: #60a5fa !important;
+    font-weight: 700 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
   }
 
   .hero-section {
