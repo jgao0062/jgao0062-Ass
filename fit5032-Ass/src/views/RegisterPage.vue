@@ -157,25 +157,6 @@
                   </div>
                 </div>
 
-                <div class="mb-3">
-                  <label class="form-label">Interested Programs (Select all that apply)</label>
-                  <div class="row">
-                    <div class="col-md-6" v-for="program in availablePrograms.slice(0, 6)" :key="program.id">
-                      <div class="form-check">
-                        <input
-                          class="form-check-input"
-                          type="checkbox"
-                          :value="program.name"
-                          v-model="registration.interestedPrograms"
-                          :id="'program-' + program.id"
-                        >
-                        <label class="form-check-label" :for="'program-' + program.id">
-                          {{ program.name }}
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
                 <div class="mb-3">
                   <label class="form-label">Emergency Contact Name *</label>
@@ -271,11 +252,11 @@
   </template>
 
   <script>
-  import { ref, reactive, onMounted } from 'vue'
+  import { ref, reactive } from 'vue'
   import { validateEmail, validatePhone, validateName, validateAge, validatePassword, validateConfirmPassword } from '../utils/validation.js'
   import { registerUser } from '../utils/auth.js'
   import { escapeHtml, securityLog } from '../utils/security.js'
-  import { saveUserRegistrationToFirebase, saveUserProfileToFirebase, getAllPrograms } from '../services/userService.js'
+  import { saveUserRegistrationToFirebase, saveUserProfileToFirebase } from '../services/userService.js'
 
 
   export default {
@@ -283,23 +264,6 @@
     setup() {
       const isSubmitting = ref(false)
       const showSuccessMessage = ref(false)
-      const availablePrograms = ref([])
-
-      // Load programs from Firebase
-      const loadPrograms = async () => {
-        try {
-          const result = await getAllPrograms()
-          if (result.success) {
-            availablePrograms.value = result.data
-          }
-        } catch (error) {
-          console.error('Error loading programs from Firebase:', error)
-        }
-      }
-
-      onMounted(() => {
-        loadPrograms()
-      })
 
       // BR (B.1): Form data structure for dynamic binding
       const registration = reactive({
@@ -311,7 +275,6 @@
         confirmPassword: '',
         age: '',
         language: 'English',
-        interestedPrograms: [],
         emergencyContact: '',
         emergencyPhone: '',
         agreeTerms: false
@@ -446,21 +409,12 @@
             })
           }
 
-          // Update participant counts for selected programs (in memory only)
-          registration.interestedPrograms.forEach(programName => {
-            const program = availablePrograms.value.find(p => p.name === programName)
-            if (program) {
-              program.participants += 1
-            }
-          })
 
           // Note: Stats and registration data are now stored in Firebase only
 
           // Reset form
           Object.keys(registration).forEach(key => {
-            if (Array.isArray(registration[key])) {
-              registration[key] = []
-            } else if (typeof registration[key] === 'boolean') {
+            if (typeof registration[key] === 'boolean') {
               registration[key] = false
             } else {
               registration[key] = ''
@@ -510,7 +464,6 @@
       return {
         registration,
         errors,
-        availablePrograms,
         isSubmitting,
         showSuccessMessage,
         validateField,
