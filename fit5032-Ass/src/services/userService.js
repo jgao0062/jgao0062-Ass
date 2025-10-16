@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../config/firebase.js'
 import { securityLog } from '../utils/security.js'
+import { sendProgramJoinEmail } from './emailService.js'
 
 // User data collection names
 const USERS_COLLECTION = 'users'
@@ -753,8 +754,6 @@ export async function getUserActivities(userId) {
  */
 export async function addUserActivity(userId, programId, programName) {
   try {
-    // Debug logging
-    console.log('addUserActivity called with:', { userId, programId, programName })
     
     // Ensure IDs are strings for Firebase consistency
     const userIdStr = String(userId)
@@ -795,6 +794,61 @@ export async function addUserActivity(userId, programId, programName) {
       programName,
       activityId: docRef.id
     })
+
+    // Send confirmation email
+    try {
+      // Get user profile data for email
+      const userProfileResult = await getUserProfileFromFirebase(userIdStr)
+      
+      if (userProfileResult.success) {
+        const userData = userProfileResult.data
+        
+        // Get program details for email
+        const programDocRef = doc(db, PROGRAMS_COLLECTION, programIdStr)
+        const programDoc = await getDoc(programDocRef)
+        
+        // Create program data (use provided programName if document doesn't exist)
+        const programData = {
+          id: programIdStr,
+          name: programDoc.exists() ? (programDoc.data().name || programName) : programName,
+          description: programDoc.exists() ? (programDoc.data().description || '') : '',
+          schedule: programDoc.exists() ? (programDoc.data().schedule || '') : '',
+          location: programDoc.exists() ? (programDoc.data().location || '') : ''
+        }
+        
+        // Send email (don't wait for it to complete)
+        sendProgramJoinEmail(userData, programData).then(emailResult => {
+          if (emailResult.success) {
+            securityLog('info', 'Program join confirmation email sent', {
+              userId,
+              programId,
+              userEmail: userData.email
+            })
+          } else {
+            securityLog('warning', 'Failed to send program join confirmation email', {
+              userId,
+              programId,
+              userEmail: userData.email,
+              error: emailResult.message
+            })
+          }
+        }).catch(emailError => {
+          securityLog('error', 'Email sending error', {
+            userId,
+            programId,
+            userEmail: userData.email,
+            error: emailError.message
+          })
+        })
+      }
+    } catch (emailError) {
+      // Don't fail the join operation if email fails
+      securityLog('warning', 'Failed to send confirmation email', {
+        userId,
+        programId,
+        error: emailError.message
+      })
+    }
 
     return {
       success: true,
