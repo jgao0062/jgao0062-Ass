@@ -142,6 +142,9 @@
               <button class="btn btn-sm btn-outline-primary me-2" @click="refreshData" :disabled="loading">
                 <i class="fas fa-sync-alt me-1" :class="{ 'fa-spin': loading }"></i>Refresh
               </button>
+              <button class="btn btn-sm btn-outline-warning me-2" @click="reorderProgramIdsHandler" :disabled="loading">
+                <i class="fas fa-sort-numeric-up me-1"></i>Reorder IDs
+              </button>
               <button class="btn btn-sm btn-success" @click="showAddProgram = true">
                 <i class="fas fa-plus me-1"></i>Add Program
               </button>
@@ -431,7 +434,8 @@ import {
   getAllActivities,
   getProgramAverageRating,
   deleteUser,
-  updateUserRole
+  updateUserRole,
+  reorderProgramIds
 } from '../services/userService.js'
 
 export default {
@@ -577,6 +581,36 @@ export default {
     // Refresh data function
     const refreshData = async () => {
       await loadData()
+    }
+
+    // Reorder program IDs function
+    const reorderProgramIdsHandler = async () => {
+      if (confirm('Are you sure you want to reorder all program IDs? This will make all IDs consecutive starting from 1.')) {
+        loading.value = true
+        try {
+          const result = await reorderProgramIds()
+          if (result.success) {
+            programSuccess.value = result.message
+            // Refresh data to show updated IDs
+            await loadData()
+            setTimeout(() => {
+              programSuccess.value = ''
+            }, 5000)
+          } else {
+            programError.value = result.message
+            setTimeout(() => {
+              programError.value = ''
+            }, 5000)
+          }
+        } catch (error) {
+          programError.value = 'Error reordering program IDs: ' + error.message
+          setTimeout(() => {
+            programError.value = ''
+          }, 5000)
+        } finally {
+          loading.value = false
+        }
+      }
     }
 
     // Load ratings data for all programs
@@ -969,6 +1003,7 @@ export default {
       getProgramRating,
       getProgramRatingDisplay,
       refreshData,
+      reorderProgramIdsHandler,
       // Pagination
       currentPage,
       itemsPerPage,

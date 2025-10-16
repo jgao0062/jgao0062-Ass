@@ -1216,6 +1216,9 @@ export async function deleteProgram(programId) {
       })
     }
 
+    // Reorder remaining programs to maintain consecutive IDs
+    await reorderProgramIds()
+
     securityLog('info', 'Program deleted from Firebase', {
       programId,
       programName: programData.name,
@@ -1235,6 +1238,108 @@ export async function deleteProgram(programId) {
     return {
       success: false,
       message: 'Failed to delete program: ' + error.message
+    }
+  }
+}
+
+/**
+ * Reorder program IDs to maintain consecutive sequence
+ * @returns {Promise<Object>} Operation result
+ */
+export async function reorderProgramIds() {
+  try {
+    // Get all programs sorted by current ID
+    const q = query(
+      collection(db, PROGRAMS_COLLECTION),
+      orderBy('id', 'asc')
+    )
+    
+    const querySnapshot = await getDocs(q)
+    const programs = []
+    
+    querySnapshot.forEach((doc) => {
+      programs.push({
+        docId: doc.id,
+        ...doc.data()
+      })
+    })
+
+    // If no programs or already consecutive, no need to reorder
+    if (programs.length === 0) {
+      return { success: true, message: 'No programs to reorder' }
+    }
+
+    // Check if IDs are already consecutive starting from 1
+    let needsReorder = false
+    for (let i = 0; i < programs.length; i++) {
+      if (parseInt(programs[i].id) !== i + 1) {
+        needsReorder = true
+        break
+      }
+    }
+
+    if (!needsReorder) {
+      return { success: true, message: 'Program IDs are already consecutive' }
+    }
+
+    // Reorder IDs to be consecutive starting from 1
+    const updatePromises = []
+    for (let i = 0; i < programs.length; i++) {
+      const newId = (i + 1).toString()
+      if (programs[i].id !== newId) {
+        // Update program document with new ID
+        const updatePromise = updateDoc(doc(db, PROGRAMS_COLLECTION, programs[i].docId), {
+          id: newId
+        })
+        updatePromises.push(updatePromise)
+
+        // Update related ratings and activities with new programId
+        const oldProgramId = programs[i].id
+        
+        // Update ratings
+        const ratingsQuery = query(
+          collection(db, RATINGS_COLLECTION),
+          where('programId', '==', oldProgramId)
+        )
+        const ratingsSnapshot = await getDocs(ratingsQuery)
+        const ratingUpdatePromises = ratingsSnapshot.docs.map(doc => 
+          updateDoc(doc.ref, { programId: newId })
+        )
+        updatePromises.push(...ratingUpdatePromises)
+
+        // Update activities
+        const activitiesQuery = query(
+          collection(db, ACTIVITIES_COLLECTION),
+          where('programId', '==', oldProgramId)
+        )
+        const activitiesSnapshot = await getDocs(activitiesQuery)
+        const activityUpdatePromises = activitiesSnapshot.docs.map(doc => 
+          updateDoc(doc.ref, { programId: newId })
+        )
+        updatePromises.push(...activityUpdatePromises)
+      }
+    }
+
+    // Execute all updates
+    await Promise.all(updatePromises)
+
+    securityLog('info', 'Program IDs reordered successfully', {
+      totalPrograms: programs.length,
+      updatesPerformed: updatePromises.length
+    })
+
+    return {
+      success: true,
+      message: `Program IDs reordered successfully. ${programs.length} programs now have consecutive IDs.`
+    }
+  } catch (error) {
+    securityLog('error', 'Failed to reorder program IDs', {
+      error: error.message
+    })
+
+    return {
+      success: false,
+      message: 'Failed to reorder program IDs: ' + error.message
     }
   }
 }
