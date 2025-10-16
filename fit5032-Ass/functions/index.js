@@ -1,8 +1,17 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const sgMail = require('@sendgrid/mail');
+const functions = require('firebase-functions');
+
+// Load environment variables from .env file for local development
+require('dotenv').config();
 
 // Initialize SendGrid once at module level
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Support both new .env format and legacy functions.config()
+const apiKey = process.env.SENDGRID_API_KEY || functions.config().sendgrid?.api_key;
+if (!apiKey) {
+  throw new Error('SendGrid API key not found. Please set SENDGRID_API_KEY environment variable or configure sendgrid.api_key in Firebase Functions config.');
+}
+sgMail.setApiKey(apiKey);
 
 // Email sending function
 exports.sendEmail = onRequest((req, res) => {
