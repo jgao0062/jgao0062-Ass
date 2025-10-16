@@ -270,9 +270,58 @@ export function getCurrentFirebaseUser() {
 
 export function hasRole(requiredRole) {
   const session = getSession()
-  if (!session) return false
+  if (!session) {
+    // If no session in memory, check Firebase auth state
+    const firebaseUser = getCurrentFirebaseUser()
+    if (!firebaseUser) return false
+    // For now, assume user role if Firebase user exists but session not loaded
+    // This is a fallback - ideally the session should be loaded by onAuthStateChange
+    return !requiredRole || requiredRole === 'user'
+  }
   if (!requiredRole) return true
   return session.role === requiredRole
+}
+
+// Async version of hasRole that can fetch user data from Firebase if needed
+export async function hasRoleAsync(requiredRole) {
+  const session = getSession()
+  if (session) {
+    if (!requiredRole) return true
+    return session.role === requiredRole
+  }
+  
+  // If no session, check Firebase auth state
+  const firebaseUser = getCurrentFirebaseUser()
+  if (!firebaseUser) {
+    console.log('hasRoleAsync: No Firebase user found')
+    return false
+  }
+  
+  console.log('hasRoleAsync: Checking role for Firebase user:', firebaseUser.uid)
+  
+  // Try to get user profile from Firebase
+  try {
+    const { getUserProfileFromFirebase } = await import('../services/userService.js')
+    const userProfile = await getUserProfileFromFirebase(firebaseUser.uid)
+    
+    console.log('hasRoleAsync: User profile result:', userProfile)
+    
+    if (userProfile.success) {
+      const userRole = userProfile.data.role
+      console.log(`hasRoleAsync: User role is ${userRole}, required role is ${requiredRole}`)
+      
+      if (!requiredRole) return true
+      return userRole === requiredRole
+    } else {
+      console.warn('hasRoleAsync: Failed to get user profile:', userProfile.message)
+    }
+  } catch (error) {
+    console.error('hasRoleAsync: Error fetching user profile:', error)
+  }
+  
+  // Fallback: if we can't determine the role, deny access to admin pages
+  console.warn('hasRoleAsync: Cannot determine user role, denying access')
+  return false
 }
 
 // User deletion is now handled by Firebase Admin SDK or userService.js

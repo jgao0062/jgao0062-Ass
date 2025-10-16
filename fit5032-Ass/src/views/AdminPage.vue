@@ -1,11 +1,21 @@
 <template>
   <div class="container py-5 admin-dashboard">
-    <h2 class="mb-4">Admin Dashboard</h2>
-    <p class="text-muted">Only users with role <code>admin</code> can see this page.</p>
-    <div class="alert alert-info">
-      <div>Signed in as: <strong>{{ session?.email }}</strong></div>
-      <div>Role: <strong>{{ session?.role }}</strong></div>
+    <!-- Loading state while checking authentication -->
+    <div v-if="!authChecked" class="text-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-2">Checking admin access...</p>
     </div>
+    
+    <!-- Admin dashboard content -->
+    <div v-else>
+      <h2 class="mb-4">Admin Dashboard</h2>
+      <p class="text-muted">Only users with role <code>admin</code> can see this page.</p>
+      <div class="alert alert-info">
+        <div>Signed in as: <strong>{{ session?.email }}</strong></div>
+        <div>Role: <strong>{{ session?.role }}</strong></div>
+      </div>
 
     <!-- Stats Overview -->
     <div class="row mb-4">
@@ -418,6 +428,7 @@
       </div>
     </div>
     <div v-if="showAddProgram" class="modal-backdrop fade show"></div>
+    </div>
   </div>
 </template>
 
@@ -441,14 +452,86 @@ import {
 export default {
   name: 'AdminPage',
   setup() {
-    const session = getSession()
+    const session = ref(null)
+    const authChecked = ref(false)
     
-    // Check if user is admin
-    if (!session || session.role !== 'admin') {
-      // Redirect to home page if not admin
-      window.location.href = '/'
-      return
+    // Async function to check admin access
+    const checkAdminAccess = async () => {
+      try {
+        console.log('AdminPage: Starting admin access check...')
+        
+        // First check if Firebase user exists
+        const { getCurrentFirebaseUser, hasRoleAsync } = await import('../utils/auth.js')
+        const firebaseUser = getCurrentFirebaseUser()
+        
+        console.log('AdminPage: Firebase user:', firebaseUser)
+        
+        if (!firebaseUser) {
+          console.log('AdminPage: No Firebase user, redirecting to login')
+          // No Firebase user, redirect to login
+          window.location.href = '/login'
+          return
+        }
+        
+        // Check if user has admin role
+        console.log('AdminPage: Checking admin role...')
+        const isAdmin = await hasRoleAsync('admin')
+        console.log('AdminPage: Is admin?', isAdmin)
+        
+        if (!isAdmin) {
+          console.log('AdminPage: Not admin, redirecting to home')
+          // Not admin, redirect to home
+          window.location.href = '/'
+          return
+        }
+        
+        // User is admin, get session
+        console.log('AdminPage: User is admin, setting up session')
+        const currentSession = getSession()
+        session.value = currentSession
+        authChecked.value = true
+        
+        console.log('AdminPage: Session set, loading data...')
+        // Load data after authentication is confirmed
+        loadData()
+        
+      } catch (error) {
+        console.error('AdminPage: Error checking admin access:', error)
+        window.location.href = '/'
+      }
     }
+    
+    // Check admin access on mount, using Firebase auth state listener
+    onMounted(() => {
+      // Import Firebase auth functions
+      import('../utils/auth.js').then(({ onAuthStateChange }) => {
+        // Listen for auth state changes
+        const unsubscribe = onAuthStateChange(({ user, session: authSession }) => {
+          console.log('AdminPage: Auth state changed:', { user: !!user, session: !!authSession })
+          
+          if (user) {
+            // User is authenticated, check admin access
+            checkAdminAccess()
+            unsubscribe() // Stop listening after first auth state
+          } else {
+            // No user, redirect to login
+            console.log('AdminPage: No authenticated user, redirecting to login')
+            window.location.href = '/login'
+            unsubscribe()
+          }
+        })
+        
+        // Fallback: if no auth state change occurs within 2 seconds, check anyway
+        setTimeout(() => {
+          if (!authChecked.value) {
+            console.log('AdminPage: Auth state timeout, checking access anyway')
+            checkAdminAccess()
+            unsubscribe()
+          }
+        }, 2000)
+      })
+    })
+    
     const users = ref([])
     const registrations = ref([])
     const ratings = ref({})
@@ -964,11 +1047,10 @@ export default {
       return pages
     }
 
-    onMounted(() => {
-      loadData()
-    })
+    // Data loading is now handled in checkAdminAccess after authentication is confirmed
 
     return {
+      authChecked,
       session,
       users,
       registrations,

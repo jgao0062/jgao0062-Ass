@@ -38,13 +38,75 @@ const router = createRouter({
 })
 
 // Guards: auth + role, support redirect back after login
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(r => r.meta && r.meta.requiresAuth)
   const role = to.matched.find(r => r.meta && r.meta.role)?.meta?.role
 
   if (!requiresAuth) return next()
-  if (!isLoggedIn()) return next({ path: '/login', query: { redirect: to.fullPath } })
-  if (role && !hasRole(role)) return next('/')
+  
+  console.log(`[ROUTER] Checking access to protected route: ${to.path}`)
+  
+  // Wait for Firebase auth state to be initialized
+  const { getCurrentFirebaseUser, onAuthStateChange } = await import('./utils/auth.js')
+  
+  // Check if Firebase auth is already initialized
+  let firebaseUser = getCurrentFirebaseUser()
+  
+  if (!firebaseUser) {
+    console.log('[ROUTER] No Firebase user found, waiting for auth state...')
+    
+    // Wait for Firebase auth state to be initialized
+    return new Promise((resolve) => {
+      const unsubscribe = onAuthStateChange(({ user }) => {
+        console.log('[ROUTER] Auth state received:', !!user)
+        unsubscribe()
+        
+        if (user) {
+          // User is authenticated, check role if needed
+          if (role) {
+            import('./utils/auth.js').then(({ hasRoleAsync }) => {
+              hasRoleAsync(role).then((hasRequiredRole) => {
+                console.log(`[ROUTER] Role check for ${role}:`, hasRequiredRole)
+                if (hasRequiredRole) {
+                  console.log(`[SECURITY] User accessing protected route: ${to.path}`)
+                  next()
+                } else {
+                  next('/')
+                }
+                resolve()
+              })
+            })
+          } else {
+            console.log(`[SECURITY] User accessing protected route: ${to.path}`)
+            next()
+            resolve()
+          }
+        } else {
+          // No user, redirect to login
+          console.log('[ROUTER] No authenticated user, redirecting to login')
+          next({ path: '/login', query: { redirect: to.fullPath } })
+          resolve()
+        }
+      })
+      
+      // Timeout fallback
+      setTimeout(() => {
+        console.log('[ROUTER] Auth state timeout, redirecting to login')
+        next({ path: '/login', query: { redirect: to.fullPath } })
+        resolve()
+      }, 3000)
+    })
+  }
+  
+  // Firebase user exists, check role if required
+  if (role) {
+    const { hasRoleAsync } = await import('./utils/auth.js')
+    const hasRequiredRole = await hasRoleAsync(role)
+    console.log(`[ROUTER] Role check for ${role}:`, hasRequiredRole)
+    if (!hasRequiredRole) {
+      return next('/')
+    }
+  }
 
   // Log security access
   console.log(`[SECURITY] User accessing protected route: ${to.path}`)
@@ -57,10 +119,8 @@ initializeAppSecurity()
 
 // Firebase data initialization removed - data already exists in Firebase
 
-const app = createApp(App)
-app.use(router)
-
-// Initialize Firebase authentication state listener
+// Initialize Firebase authentication state listener BEFORE mounting the app
+let authInitialized = false
 onAuthStateChange(({ user, session }) => {
   if (user && session) {
     console.log('Firebase auth state: User logged in', session)
@@ -71,6 +131,16 @@ onAuthStateChange(({ user, session }) => {
     // Trigger logout event for components
     window.dispatchEvent(new CustomEvent('userLoggedOut'))
   }
+  
+  // Mark auth as initialized after first state change
+  if (!authInitialized) {
+    authInitialized = true
+    console.log('Firebase auth state initialized')
+  }
 })
 
+const app = createApp(App)
+app.use(router)
+
+// Mount the app immediately - router guards will handle auth state
 app.mount('#app')
