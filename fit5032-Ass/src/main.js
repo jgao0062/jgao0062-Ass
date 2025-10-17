@@ -21,6 +21,7 @@ import Register from './views/RegisterPage.vue'
 import Login from './views/LoginPage.vue'
 import Admin from './views/AdminPage.vue'
 import MyActivities from './views/MyActivitiesPage.vue'
+import MapPage from './views/MapPage.vue'
 import { isLoggedIn, hasRole, onAuthStateChange } from './utils/auth.js'
 
 const routes = [
@@ -29,7 +30,8 @@ const routes = [
   { path: '/register', component: Register },
   { path: '/login', component: Login },
   { path: '/admin', component: Admin, meta: { requiresAuth: true, role: 'admin' } },
-  { path: '/my-activities', component: MyActivities, meta: { requiresAuth: true } }
+  { path: '/my-activities', component: MyActivities, meta: { requiresAuth: true } },
+  { path: '/map', component: MapPage }
 ]
 
 const router = createRouter({
@@ -43,24 +45,24 @@ router.beforeEach(async (to, from, next) => {
   const role = to.matched.find(r => r.meta && r.meta.role)?.meta?.role
 
   if (!requiresAuth) return next()
-  
+
   console.log(`[ROUTER] Checking access to protected route: ${to.path}`)
-  
+
   // Wait for Firebase auth state to be initialized
   const { getCurrentFirebaseUser, onAuthStateChange } = await import('./utils/auth.js')
-  
+
   // Check if Firebase auth is already initialized
   let firebaseUser = getCurrentFirebaseUser()
-  
+
   if (!firebaseUser) {
     console.log('[ROUTER] No Firebase user found, waiting for auth state...')
-    
+
     // Wait for Firebase auth state to be initialized
     return new Promise((resolve) => {
       const unsubscribe = onAuthStateChange(({ user }) => {
         console.log('[ROUTER] Auth state received:', !!user)
         unsubscribe()
-        
+
         if (user) {
           // User is authenticated, check role if needed
           if (role) {
@@ -88,7 +90,7 @@ router.beforeEach(async (to, from, next) => {
           resolve()
         }
       })
-      
+
       // Timeout fallback
       setTimeout(() => {
         console.log('[ROUTER] Auth state timeout, redirecting to login')
@@ -97,7 +99,7 @@ router.beforeEach(async (to, from, next) => {
       }, 3000)
     })
   }
-  
+
   // Firebase user exists, check role if required
   if (role) {
     const { hasRoleAsync } = await import('./utils/auth.js')
@@ -131,7 +133,7 @@ onAuthStateChange(({ user, session }) => {
     // Trigger logout event for components
     window.dispatchEvent(new CustomEvent('userLoggedOut'))
   }
-  
+
   // Mark auth as initialized after first state change
   if (!authInitialized) {
     authInitialized = true
