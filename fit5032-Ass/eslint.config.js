@@ -23,4 +23,13 @@ export default defineConfig([
   js.configs.recommended,
   ...pluginVue.configs['flat/essential'],
   skipFormatting,
+
+  {
+    rules: {
+      'no-control-regex': 'off',
+      'no-empty-character-class': 'off',
+      'no-irregular-whitespace': 'off',
+      'no-unused-vars': 'off',
+    },
+  },
 ])
