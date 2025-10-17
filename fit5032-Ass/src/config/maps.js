@@ -4,3 +4,12 @@ export const GOOGLE_MAPS_CONFIG = {
   libraries: ['places', 'geometry'],
   version: 'weekly'
 }
+
+// Default map settings
+export const MAP_DEFAULTS = {
+  center: {
+    lat: -37.8136,
+    lng: 144.9631
+  },
+  zoom: 12
+}
