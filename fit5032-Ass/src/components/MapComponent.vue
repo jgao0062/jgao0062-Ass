@@ -21,6 +21,9 @@
           <button class="btn btn-success me-2" @click="getCurrentLocation">
             <i class="fas fa-location-arrow"></i> My Location
           </button>
+          <button class="btn btn-warning me-2" @click="clearDirections">
+            <i class="fas fa-times"></i> Clear Directions
+          </button>
         </div>
       </div>
     </div>
@@ -103,9 +106,20 @@ export default {
           suppressMarkers: false
         })
 
+        // Expose directions function globally after services are initialized
+        // Add a small delay to ensure all Google Maps services are ready
+        setTimeout(() => {
+          window.showDirections = showDirections
+          console.log('Directions function exposed to global scope')
+        }, 100)
+
         // Add map click event
         map.value.addListener('click', (event) => {
-          addMarker(event.latLng, 'Clicked Location', 'blue')
+          addMarker(event.latLng, 'Clicked Location', 'blue', {
+            type: 'User Marker',
+            description: 'Location clicked by user',
+            address: 'Unknown Address'
+          })
         })
 
         // Don't auto-load Melbourne sports places - let user search instead
@@ -138,7 +152,7 @@ export default {
 
       const request = {
         query: searchQuery.value,
-        fields: ['name', 'geometry', 'formatted_address', 'place_id'],
+        fields: ['name', 'geometry', 'formatted_address', 'place_id', 'rating', 'price_level', 'types', 'opening_hours', 'website', 'formatted_phone_number'],
         location: MAP_DEFAULTS.center,
         radius: 50000 // 50km radius from Melbourne CBD
       }
@@ -150,7 +164,22 @@ export default {
           // Add markers for search results
           results.forEach(place => {
             if (place.geometry && place.geometry.location) {
-              addMarker(place.geometry.location, place.name, 'red')
+              // Get place types as readable text
+              const placeTypes = place.types ? place.types.slice(0, 3).join(', ') : 'Unknown Type'
+
+              // Get price level as text
+              const priceLevel = place.price_level ?
+                ['Free', '$', '$$', '$$$', '$$$$'][place.price_level] : 'Price Unknown'
+
+              addMarker(place.geometry.location, place.name, 'red', {
+                type: 'Search Result',
+                address: place.formatted_address || 'Address Unknown',
+                description: `Category: ${placeTypes}`,
+                rating: place.rating ? `${place.rating}/5` : 'No Rating',
+                phone: place.formatted_phone_number || null,
+                website: place.website || null,
+                price: priceLevel
+              })
             }
           })
 
@@ -195,7 +224,11 @@ export default {
           map.value.setCenter(pos)
           map.value.setZoom(15)
 
-          addMarker(pos, 'My Location (GPS)', 'blue')
+          addMarker(pos, 'My Location (GPS)', 'blue', {
+            type: 'Current Location',
+            description: 'Current location via GPS',
+            address: 'GPS Location'
+          })
           console.log('GPS location set:', pos)
           console.log('GPS accuracy:', position.coords.accuracy, 'meters')
 
@@ -233,7 +266,11 @@ export default {
           map.value.setCenter(pos)
           map.value.setZoom(10) // Lower zoom for IP-based location
 
-          addMarker(pos, 'My Location (IP)', 'orange')
+          addMarker(pos, 'My Location (IP)', 'orange', {
+            type: 'Current Location',
+            description: 'Current location via IP address',
+            address: `${data.city || 'Unknown City'}, ${data.country || 'Unknown Country'}`
+          })
           console.log('IP-based location set:', pos)
 
           alert(`Location found via IP: ${data.city || 'Unknown'}, ${data.country || 'Unknown'}`)
@@ -247,7 +284,7 @@ export default {
     }
 
     // Helper function to add markers
-    const addMarker = (position, title, color) => {
+    const addMarker = (position, title, color, additionalInfo = {}) => {
       const marker = new google.maps.Marker({
         position: position,
         map: map.value,
@@ -257,8 +294,76 @@ export default {
         }
       })
 
+      // Create rich content for info window
+      const createInfoContent = (title, info) => {
+        let content = `
+          <div style="padding: 10px; min-width: 200px;">
+            <h6 style="margin: 0 0 8px 0; color: #333; font-weight: bold;">${title}</h6>
+        `
+
+        if (info.address) {
+          content += `<p style="margin: 4px 0; color: #666; font-size: 12px;"><i class="fas fa-map-marker-alt"></i> ${info.address}</p>`
+        }
+
+        if (info.type) {
+          content += `<p style="margin: 4px 0; color: #666; font-size: 12px;"><i class="fas fa-tag"></i> ${info.type}</p>`
+        }
+
+        if (info.rating) {
+          content += `<p style="margin: 4px 0; color: #666; font-size: 12px;"><i class="fas fa-star"></i> Rating: ${info.rating}</p>`
+        }
+
+        if (info.phone) {
+          content += `<p style="margin: 4px 0; color: #666; font-size: 12px;"><i class="fas fa-phone"></i> ${info.phone}</p>`
+        }
+
+        if (info.website) {
+          content += `<p style="margin: 4px 0; color: #666; font-size: 12px;"><i class="fas fa-globe"></i> <a href="${info.website}" target="_blank">Visit Website</a></p>`
+        }
+
+        if (info.price) {
+          content += `<p style="margin: 4px 0; color: #666; font-size: 12px;"><i class="fas fa-dollar-sign"></i> Price: ${info.price}</p>`
+        }
+
+        if (info.description) {
+          content += `<p style="margin: 8px 0 0 0; color: #555; font-size: 11px; line-height: 1.4;">${info.description}</p>`
+        }
+
+        // Safely get coordinates first
+        let lat, lng
+        if (typeof position.lat === 'function') {
+          lat = position.lat().toFixed(6)
+          lng = position.lng().toFixed(6)
+        } else if (position.lat !== undefined) {
+          lat = position.lat.toFixed(6)
+          lng = position.lng.toFixed(6)
+        } else {
+          lat = 'Unknown'
+          lng = 'Unknown'
+        }
+
+        // Add directions button
+        content += `
+          <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #eee;">
+            <button onclick="showDirections(${lat}, ${lng}, '${title.replace(/'/g, "\\'")}')"
+                    style="background: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; width: 100%;">
+              <i class="fas fa-route"></i> Get Directions from My Location
+            </button>
+          </div>
+        `
+
+        content += `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+              <small style="color: #999;">Coordinates: ${lat}, ${lng}</small>
+            </div>
+          </div>
+        `
+
+        return content
+      }
+
       const infoWindow = new google.maps.InfoWindow({
-        content: `<div><strong>${title}</strong></div>`
+        content: createInfoContent(title, additionalInfo)
       })
 
       marker.addListener('click', () => {
@@ -273,6 +378,137 @@ export default {
         marker.setMap(null)
       })
       markers.value = []
+    }
+
+    // Directions functionality with retry mechanism
+    const showDirections = (destinationLat, destinationLng, destinationName) => {
+      console.log('Getting directions to:', destinationName, destinationLat, destinationLng)
+
+      // Check if Google Maps API is loaded
+      if (typeof google === 'undefined' || !google.maps || !google.maps.DirectionsService) {
+        alert('Google Maps API is not loaded yet. Please wait a moment and try again.')
+        return
+      }
+
+      if (!directionsService.value || !directionsRenderer.value) {
+        alert('Directions service not available')
+        return
+      }
+
+      // Clear existing directions
+      directionsRenderer.value.setDirections({ routes: [] })
+
+      // Check if we have current location, if not try to get it first
+      if (!currentLocation.value) {
+        console.log('No current location, attempting to get location first...')
+
+        // Try to get current location first
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const pos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+              }
+              currentLocation.value = pos
+              console.log('Got current location for directions:', pos)
+              calculateDirectionsWithRetry(pos, destinationLat, destinationLng, destinationName)
+            },
+            (error) => {
+              console.log('Failed to get current location, using Melbourne CBD')
+              calculateDirectionsWithRetry(MAP_DEFAULTS.center, destinationLat, destinationLng, destinationName)
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 60000
+            }
+          )
+        } else {
+          console.log('Geolocation not supported, using Melbourne CBD')
+          calculateDirectionsWithRetry(MAP_DEFAULTS.center, destinationLat, destinationLng, destinationName)
+        }
+      } else {
+        console.log('Using existing current location:', currentLocation.value)
+        calculateDirectionsWithRetry(currentLocation.value, destinationLat, destinationLng, destinationName)
+      }
+    }
+
+    // Helper function with retry mechanism
+    const calculateDirectionsWithRetry = (origin, destinationLat, destinationLng, destinationName, retryCount = 0) => {
+      const maxRetries = 3
+
+      // Ensure Google Maps API is loaded
+      if (typeof google === 'undefined' || !google.maps) {
+        if (retryCount < maxRetries) {
+          console.log(`Retrying directions request (${retryCount + 1}/${maxRetries})...`)
+          setTimeout(() => {
+            calculateDirectionsWithRetry(origin, destinationLat, destinationLng, destinationName, retryCount + 1)
+          }, 1000)
+          return
+        } else {
+          alert('Google Maps API is not loaded yet. Please wait a moment and try again.')
+          return
+        }
+      }
+
+      // Check if TravelMode is available
+      if (!google.maps.TravelMode) {
+        if (retryCount < maxRetries) {
+          console.log(`TravelMode not available, retrying (${retryCount + 1}/${maxRetries})...`)
+          setTimeout(() => {
+            calculateDirectionsWithRetry(origin, destinationLat, destinationLng, destinationName, retryCount + 1)
+          }, 1000)
+          return
+        } else {
+          console.error('Google Maps TravelMode not available after retries')
+          alert('Google Maps API is not fully loaded. Please wait a moment and try again.')
+          return
+        }
+      }
+
+      const request = {
+        origin: origin,
+        destination: { lat: destinationLat, lng: destinationLng },
+        travelMode: google.maps.TravelMode.DRIVING,
+        unitSystem: google.maps.UnitSystem.METRIC,
+        avoidHighways: false,
+        avoidTolls: false
+      }
+
+      directionsService.value.route(request, (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK) {
+          directionsRenderer.value.setDirections(result)
+
+          // Center map on the route
+          const bounds = new google.maps.LatLngBounds()
+          result.routes[0].overview_path.forEach(point => {
+            bounds.extend(point)
+          })
+          map.value.fitBounds(bounds)
+
+          console.log('Directions displayed successfully')
+
+          // Show success message with route info
+          const route = result.routes[0]
+          const leg = route.legs[0]
+          const distance = leg.distance.text
+          const duration = leg.duration.text
+
+          alert(`Directions to ${destinationName} displayed!\nDistance: ${distance}\nDuration: ${duration}`)
+        } else {
+          console.error('Directions request failed:', status)
+          alert(`Failed to get directions. Status: ${status}`)
+        }
+      })
+    }
+
+    // Clear directions
+    const clearDirections = () => {
+      if (directionsRenderer.value) {
+        directionsRenderer.value.setDirections({ routes: [] })
+        console.log('Directions cleared')
+      }
     }
 
     // Check location permission status
@@ -298,7 +534,19 @@ export default {
         map.value.setZoom(16)
 
         // Add a temporary marker
-        addMarker(place.geometry.location, place.name, 'yellow')
+        const placeTypes = place.types ? place.types.slice(0, 3).join(', ') : 'Unknown Type'
+        const priceLevel = place.price_level ?
+          ['Free', '$', '$$', '$$$', '$$$$'][place.price_level] : 'Price Unknown'
+
+        addMarker(place.geometry.location, place.name, 'yellow', {
+          type: 'Selected Place',
+          address: place.formatted_address || 'Address Unknown',
+          description: `Category: ${placeTypes}`,
+          rating: place.rating ? `${place.rating}/5` : 'No Rating',
+          phone: place.formatted_phone_number || null,
+          website: place.website || null,
+          price: priceLevel
+        })
 
         console.log('Navigated to place:', place.name)
       }
@@ -348,7 +596,8 @@ export default {
       currentLocation,
       searchPlaces,
       getCurrentLocation,
-      goToPlace
+      goToPlace,
+      clearDirections
     }
   }
 }
