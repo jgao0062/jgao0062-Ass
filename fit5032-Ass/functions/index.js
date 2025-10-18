@@ -1,9 +1,15 @@
 const {onRequest} = require("firebase-functions/v2/https");
 const sgMail = require('@sendgrid/mail');
 const functions = require('firebase-functions');
+const admin = require('firebase-admin');
 
 // Load environment variables from .env file for local development
 require('dotenv').config();
+
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 // Initialize SendGrid once at module level
 // Support both new .env format and legacy functions.config()
@@ -54,6 +60,109 @@ exports.sendEmail = onRequest((req, res) => {
       })
       .catch((error) => {
         console.error('SendGrid Error:', error);
+        return res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      });
+
+  } catch (error) {
+    console.error('Function Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get activity statistics function
+exports.getActivityStats = onRequest((req, res) => {
+  // Enable CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Only GET allowed' });
+  }
+
+  try {
+    const db = admin.firestore();
+
+    // Get all activities from the activities collection
+    db.collection('activities').get()
+      .then((snapshot) => {
+        const programStats = {};
+        const totalActivities = snapshot.size;
+
+        // Count activities by programId
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const programId = data.programId;
+
+          if (programId) {
+            if (!programStats[programId]) {
+              programStats[programId] = {
+                count: 0,
+                programName: data.programName || `Program ${programId}`,
+                programId: programId
+              };
+            }
+            programStats[programId].count++;
+          }
+        });
+
+        // Convert to array and sort by count (most popular first)
+        const sortedStats = Object.values(programStats)
+          .sort((a, b) => b.count - a.count);
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            totalActivities,
+            programStats: sortedStats,
+            chartData: {
+              labels: sortedStats.map(stat => stat.programName),
+              datasets: [{
+                label: 'Participation Count',
+                data: sortedStats.map(stat => stat.count),
+                backgroundColor: [
+                  '#FF6384',
+                  '#36A2EB',
+                  '#FFCE56',
+                  '#4BC0C0',
+                  '#9966FF',
+                  '#FF9F40',
+                  '#FF6384',
+                  '#C9CBCF',
+                  '#4BC0C0',
+                  '#FF6384'
+                ],
+                borderColor: [
+                  '#FF6384',
+                  '#36A2EB',
+                  '#FFCE56',
+                  '#4BC0C0',
+                  '#9966FF',
+                  '#FF9F40',
+                  '#FF6384',
+                  '#C9CBCF',
+                  '#4BC0C0',
+                  '#FF6384'
+                ],
+                borderWidth: 1
+              }]
+            }
+          }
+        });
+      })
+      .catch((error) => {
+        console.error('Firestore Error:', error);
         return res.status(500).json({
           success: false,
           error: error.message

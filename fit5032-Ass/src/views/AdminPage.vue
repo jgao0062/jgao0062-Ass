@@ -7,7 +7,7 @@
       </div>
       <p class="mt-2">Checking admin access...</p>
     </div>
-    
+
     <!-- Admin dashboard content -->
     <div v-else>
       <h2 class="mb-4">Admin Dashboard</h2>
@@ -208,7 +208,7 @@
                 </tbody>
               </table>
             </div>
-            
+
             <!-- Pagination Controls -->
             <div class="d-flex justify-content-between align-items-center mt-3" v-if="totalPages > 1">
               <div class="text-muted">
@@ -226,12 +226,12 @@
                       <i class="fas fa-angle-left"></i>
                     </button>
                   </li>
-                  
+
                   <!-- Page numbers -->
                   <li v-for="page in getVisiblePages()" :key="page" class="page-item" :class="{ active: page === currentPage }">
                     <button class="page-link" @click="goToPage(page)">{{ page }}</button>
                   </li>
-                  
+
                   <li class="page-item" :class="{ disabled: currentPage === totalPages }">
                     <button class="page-link" @click="goToNextPage" :disabled="currentPage === totalPages">
                       <i class="fas fa-angle-right"></i>
@@ -247,6 +247,13 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Activity Statistics Chart -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <ActivityStatsChart />
       </div>
     </div>
 
@@ -435,12 +442,12 @@
 <script>
 import { ref, computed, onMounted, watch } from 'vue'
 import { getSession, registerUser } from '../utils/auth.js'
-import { 
+import {
   getAllUsers,
-  getAllUserRegistrations, 
-  getAllPrograms, 
-  addProgram, 
-  updateProgram, 
+  getAllUserRegistrations,
+  getAllPrograms,
+  addProgram,
+  updateProgram,
   deleteProgram,
   getAllActivities,
   getProgramAverageRating,
@@ -448,59 +455,63 @@ import {
   updateUserRole,
   reorderProgramIds
 } from '../services/userService.js'
+import ActivityStatsChart from '../components/ActivityStatsChart.vue'
 
 export default {
   name: 'AdminPage',
+  components: {
+    ActivityStatsChart
+  },
   setup() {
     const session = ref(null)
     const authChecked = ref(false)
-    
+
     // Async function to check admin access
     const checkAdminAccess = async () => {
       try {
         console.log('AdminPage: Starting admin access check...')
-        
+
         // First check if Firebase user exists
         const { getCurrentFirebaseUser, hasRoleAsync } = await import('../utils/auth.js')
         const firebaseUser = getCurrentFirebaseUser()
-        
+
         console.log('AdminPage: Firebase user:', firebaseUser)
-        
+
         if (!firebaseUser) {
           console.log('AdminPage: No Firebase user, redirecting to login')
           // No Firebase user, redirect to login
           window.location.href = '/login'
           return
         }
-        
+
         // Check if user has admin role
         console.log('AdminPage: Checking admin role...')
         const isAdmin = await hasRoleAsync('admin')
         console.log('AdminPage: Is admin?', isAdmin)
-        
+
         if (!isAdmin) {
           console.log('AdminPage: Not admin, redirecting to home')
           // Not admin, redirect to home
           window.location.href = '/'
           return
         }
-        
+
         // User is admin, get session
         console.log('AdminPage: User is admin, setting up session')
         const currentSession = getSession()
         session.value = currentSession
         authChecked.value = true
-        
+
         console.log('AdminPage: Session set, loading data...')
         // Load data after authentication is confirmed
         loadData()
-        
+
       } catch (error) {
         console.error('AdminPage: Error checking admin access:', error)
         window.location.href = '/'
       }
     }
-    
+
     // Check admin access on mount, using Firebase auth state listener
     onMounted(() => {
       // Import Firebase auth functions
@@ -508,7 +519,7 @@ export default {
         // Listen for auth state changes
         const unsubscribe = onAuthStateChange(({ user, session: authSession }) => {
           console.log('AdminPage: Auth state changed:', { user: !!user, session: !!authSession })
-          
+
           if (user) {
             // User is authenticated, check admin access
             checkAdminAccess()
@@ -520,7 +531,7 @@ export default {
             unsubscribe()
           }
         })
-        
+
         // Fallback: if no auth state change occurs within 2 seconds, check anyway
         setTimeout(() => {
           if (!authChecked.value) {
@@ -531,7 +542,7 @@ export default {
         }, 2000)
       })
     })
-    
+
     const users = ref([])
     const registrations = ref([])
     const ratings = ref({})
@@ -597,7 +608,7 @@ export default {
       loading.value = true
       try {
         console.log('Loading admin data...')
-        
+
         // Load users from Firebase
         const usersResult = await getAllUsers()
         if (usersResult.success) {
@@ -636,19 +647,19 @@ export default {
             }
             participantCounts[programId]++
           })
-          
+
           // Update programs with actual participant counts
           programs.value = programs.value.map(program => ({
             ...program,
             actualParticipants: participantCounts[program.id] || 0
           }))
-          
+
           console.log('Participant counts calculated:', participantCounts)
         }
 
         // Load ratings data
         await loadRatingsData()
-        
+
       } catch (error) {
         console.error('Error loading admin data:', error)
         // No fallback data - show empty state
@@ -701,7 +712,7 @@ export default {
       try {
         console.log('Loading ratings data...')
         const programRatings = {}
-        
+
         // Load ratings for each program
         for (const program of programs.value) {
           const ratingResult = await getProgramAverageRating(program.id)
@@ -717,7 +728,7 @@ export default {
             }
           }
         }
-        
+
         ratings.value = programRatings
         console.log('Ratings data loaded:', programRatings)
       } catch (error) {
@@ -729,27 +740,27 @@ export default {
     const stats = computed(() => {
       const totalUsers = users.value.length
       const totalRegistrations = registrations.value.length
-      
+
       // Calculate total ratings and average from the new ratings structure
       let totalRatings = 0
       let totalRatingValue = 0
-      
+
       Object.values(ratings.value).forEach(rating => {
         totalRatings += rating.count || 0
         totalRatingValue += (rating.average || 0) * (rating.count || 0)
       })
-      
+
       const avgRating = totalRatings > 0 ? totalRatingValue / totalRatings : 0
-      
+
       return { totalUsers, totalRegistrations, totalRatings, avgRating }
     })
 
     const programRatings = computed(() => {
       return Object.entries(ratings.value).map(([programId, ratingData]) => {
-        return { 
-          programId, 
-          average: Math.round((ratingData.average || 0) * 10) / 10, 
-          count: ratingData.count || 0 
+        return {
+          programId,
+          average: Math.round((ratingData.average || 0) * 10) / 10,
+          count: ratingData.count || 0
         }
       })
     })
@@ -864,7 +875,7 @@ export default {
     const toggleUserRole = async (userId, currentRole) => {
       const newRole = currentRole === 'admin' ? 'user' : 'admin'
       const action = newRole === 'admin' ? 'promote to admin' : 'demote to user'
-      
+
       if (confirm(`Are you sure you want to ${action} this user?`)) {
         try {
           const result = await updateUserRole(userId, newRole)
@@ -1023,7 +1034,7 @@ export default {
     const getVisiblePages = () => {
       const pages = []
       const maxVisible = 5 // Show maximum 5 page numbers
-      
+
       if (totalPages.value <= maxVisible) {
         // Show all pages if total pages is less than max visible
         for (let i = 1; i <= totalPages.value; i++) {
@@ -1033,17 +1044,17 @@ export default {
         // Show pages around current page
         let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2))
         let end = Math.min(totalPages.value, start + maxVisible - 1)
-        
+
         // Adjust start if we're near the end
         if (end - start + 1 < maxVisible) {
           start = Math.max(1, end - maxVisible + 1)
         }
-        
+
         for (let i = start; i <= end; i++) {
           pages.push(i)
         }
       }
-      
+
       return pages
     }
 
