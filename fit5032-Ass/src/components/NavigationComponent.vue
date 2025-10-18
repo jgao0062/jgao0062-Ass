@@ -21,9 +21,10 @@
               <router-link to="/programs" class="nav-link" @click="closeMobileMenu">Programs</router-link>
             </li>
             <li class="nav-item">
-              <router-link to="/map" class="nav-link" @click="closeMobileMenu">
-                <i class="fas fa-map-marked-alt"></i> Map
-              </router-link>
+              <router-link to="/map" class="nav-link" @click="closeMobileMenu">Map</router-link>
+            </li>
+            <li class="nav-item" v-if="session">
+              <router-link to="/appointments" class="nav-link" @click="closeMobileMenu">My Calendar</router-link>
             </li>
             <li class="nav-item">
               <router-link to="/register" class="nav-link" @click="closeMobileMenu">Join Us</router-link>

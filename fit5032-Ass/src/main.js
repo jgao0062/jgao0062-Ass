@@ -22,6 +22,7 @@ import Login from './views/LoginPage.vue'
 import Admin from './views/AdminPage.vue'
 import MyActivities from './views/MyActivitiesPage.vue'
 import MapPage from './views/MapPage.vue'
+import AppointmentPage from './views/AppointmentPage.vue'
 import { isLoggedIn, hasRole, onAuthStateChange } from './utils/auth.js'
 
 const routes = [
@@ -31,7 +32,8 @@ const routes = [
   { path: '/login', component: Login },
   { path: '/admin', component: Admin, meta: { requiresAuth: true, role: 'admin' } },
   { path: '/my-activities', component: MyActivities, meta: { requiresAuth: true } },
-  { path: '/map', component: MapPage }
+  { path: '/map', component: MapPage },
+  { path: '/appointments', component: AppointmentPage, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

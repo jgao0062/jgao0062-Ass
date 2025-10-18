@@ -15,6 +15,11 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.0.0",
+    "@fullcalendar/core": "^6.1.19",
+    "@fullcalendar/daygrid": "^6.1.19",
+    "@fullcalendar/interaction": "^6.1.19",
+    "@fullcalendar/timegrid": "^6.1.19",
+    "@fullcalendar/vue3": "^6.1.19",
     "@googlemaps/js-api-loader": "^2.0.1",
     "@vitejs/plugin-vue": "^6.0.1",
     "bootstrap": "^5.3.0",
