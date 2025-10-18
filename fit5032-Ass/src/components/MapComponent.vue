@@ -21,9 +21,6 @@
           <button class="btn btn-success me-2" @click="getCurrentLocation">
             <i class="fas fa-location-arrow"></i> My Location
           </button>
-          <button class="btn btn-warning me-2" @click="clearDirections">
-            <i class="fas fa-times"></i> Clear Directions
-          </button>
         </div>
       </div>
     </div>
@@ -528,14 +525,6 @@ export default {
       }
     }
 
-    // Clear directions
-    const clearDirections = () => {
-      if (directionsRenderer.value) {
-        directionsRenderer.value.setDirections({ routes: [] })
-        console.log('Directions cleared')
-      }
-    }
-
     // Check location permission status
     const checkLocationPermission = () => {
       if (!navigator.geolocation) {
@@ -621,8 +610,7 @@ export default {
       currentLocation,
       searchPlaces,
       getCurrentLocation,
-      goToPlace,
-      clearDirections
+      goToPlace
     }
   }
 }
