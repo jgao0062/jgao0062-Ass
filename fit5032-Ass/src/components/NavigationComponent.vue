@@ -20,10 +20,10 @@
             <li class="nav-item">
               <router-link to="/programs" class="nav-link" @click="closeMobileMenu">Programs</router-link>
             </li>
-            <li class="nav-item">
+            <li class="nav-item" v-if="session && session.role === 'user'">
               <router-link to="/map" class="nav-link" @click="closeMobileMenu">Map</router-link>
             </li>
-            <li class="nav-item" v-if="session">
+            <li class="nav-item" v-if="session && session.role === 'user'">
               <router-link to="/appointments" class="nav-link" @click="closeMobileMenu">My Calendar</router-link>
             </li>
             <li class="nav-item">

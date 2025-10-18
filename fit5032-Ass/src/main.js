@@ -32,8 +32,8 @@ const routes = [
   { path: '/login', component: Login },
   { path: '/admin', component: Admin, meta: { requiresAuth: true, role: 'admin' } },
   { path: '/my-activities', component: MyActivities, meta: { requiresAuth: true } },
-  { path: '/map', component: MapPage },
-  { path: '/appointments', component: AppointmentPage, meta: { requiresAuth: true } }
+  { path: '/map', component: MapPage, meta: { requiresAuth: true, role: 'user' } },
+  { path: '/appointments', component: AppointmentPage, meta: { requiresAuth: true, role: 'user' } }
 ]
 
 const router = createRouter({
@@ -75,6 +75,7 @@ router.beforeEach(async (to, from, next) => {
                   console.log(`[SECURITY] User accessing protected route: ${to.path}`)
                   next()
                 } else {
+                  console.log(`[ROUTER] Access denied - user does not have required role: ${role}`)
                   next('/')
                 }
                 resolve()
@@ -108,6 +109,7 @@ router.beforeEach(async (to, from, next) => {
     const hasRequiredRole = await hasRoleAsync(role)
     console.log(`[ROUTER] Role check for ${role}:`, hasRequiredRole)
     if (!hasRequiredRole) {
+      console.log(`[ROUTER] Access denied - user does not have required role: ${role}`)
       return next('/')
     }
   }

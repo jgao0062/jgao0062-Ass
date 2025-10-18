@@ -47,10 +47,6 @@
           <!-- Chart canvas -->
           <div class="chart-wrapper">
             <canvas ref="chartCanvas" width="400" height="400"></canvas>
-            <!-- Debug info -->
-            <div v-if="chartData" class="mt-2 text-center text-muted small">
-              Debug: Chart data loaded with {{ chartData.labels?.length || 0 }} labels
-            </div>
           </div>
 
           <!-- Stats table -->
