@@ -21,6 +21,22 @@
           <button class="btn btn-success me-2" @click="getCurrentLocation">
             <i class="fas fa-location-arrow"></i> My Location
           </button>
+          <div class="btn-group me-2" role="group">
+            <button
+              class="btn btn-outline-primary"
+              :class="{ 'active': travelMode === 'DRIVING' }"
+              @click="setTravelMode('DRIVING')"
+            >
+              <i class="fas fa-car"></i> Driving
+            </button>
+            <button
+              class="btn btn-outline-primary"
+              :class="{ 'active': travelMode === 'WALKING' }"
+              @click="setTravelMode('WALKING')"
+            >
+              <i class="fas fa-walking"></i> Walking
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -80,6 +96,7 @@ export default {
     const placesService = ref(null)
     const geocoder = ref(null)
     const markers = ref([])
+    const travelMode = ref('DRIVING') // Default driving mode
 
     const initMap = () => {
       try {
@@ -377,6 +394,12 @@ export default {
       markers.value = []
     }
 
+    // Set travel mode
+    const setTravelMode = (mode) => {
+      travelMode.value = mode
+      console.log('Travel mode changed to:', mode)
+    }
+
     // Check if all required Google Maps APIs are available
     const isGoogleMapsReady = () => {
       return typeof google !== 'undefined' &&
@@ -481,10 +504,10 @@ export default {
         const request = {
           origin: origin,
           destination: { lat: destinationLat, lng: destinationLng },
-          travelMode: google.maps.TravelMode.DRIVING,
+          travelMode: google.maps.TravelMode[travelMode.value],
           unitSystem: google.maps.UnitSystem.METRIC,
-          avoidHighways: false,
-          avoidTolls: false
+          avoidHighways: travelMode.value === 'DRIVING' ? false : undefined,
+          avoidTolls: travelMode.value === 'DRIVING' ? false : undefined
         }
 
         console.log('Sending directions request:', request)
@@ -509,7 +532,8 @@ export default {
               const distance = leg.distance.text
               const duration = leg.duration.text
 
-              alert(`Directions to ${destinationName} displayed!\nDistance: ${distance}\nDuration: ${duration}`)
+              const modeText = travelMode.value === 'DRIVING' ? 'Driving' : 'Walking'
+              alert(`${modeText} directions to ${destinationName} displayed!\nDistance: ${distance}\nDuration: ${duration}`)
             } else {
               console.error('Directions request failed:', status)
               alert(`Failed to get directions. Status: ${status}`)
@@ -608,9 +632,11 @@ export default {
       searchResults,
       isLoading,
       currentLocation,
+      travelMode,
       searchPlaces,
       getCurrentLocation,
-      goToPlace
+      goToPlace,
+      setTravelMode
     }
   }
 }
@@ -640,6 +666,26 @@ export default {
 .search-results {
   max-height: 400px;
   overflow-y: auto;
+}
+
+.btn-group .btn.active {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.btn-group .btn {
+  border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+  border-top-left-radius: 0.375rem;
+  border-bottom-left-radius: 0.375rem;
+}
+
+.btn-group .btn:last-child {
+  border-top-right-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
 }
 
 .card {
