@@ -107,11 +107,11 @@ export default {
         })
 
         // Expose directions function globally after services are initialized
-        // Add a small delay to ensure all Google Maps services are ready
+        // Add a longer delay to ensure all Google Maps services are ready
         setTimeout(() => {
           window.showDirections = showDirections
           console.log('Directions function exposed to global scope')
-        }, 100)
+        }, 2000)
 
         // Add map click event
         map.value.addListener('click', (event) => {
@@ -342,10 +342,10 @@ export default {
           lng = 'Unknown'
         }
 
-        // Add directions button
+        // Add directions button with safer onclick handler
         content += `
           <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #eee;">
-            <button onclick="showDirections(${lat}, ${lng}, '${title.replace(/'/g, "\\'")}')"
+            <button onclick="if(window.showDirections && typeof window.showDirections === 'function') { window.showDirections(${lat}, ${lng}, '${title.replace(/'/g, "\\'")}'); } else { alert('Directions service is not ready yet. Please wait a moment and try again.'); }"
                     style="background: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; width: 100%;">
               <i class="fas fa-route"></i> Get Directions from My Location
             </button>
@@ -380,23 +380,50 @@ export default {
       markers.value = []
     }
 
+    // Check if all required Google Maps APIs are available
+    const isGoogleMapsReady = () => {
+      return typeof google !== 'undefined' &&
+             google.maps &&
+             google.maps.DirectionsService &&
+             google.maps.TravelMode &&
+             google.maps.TravelMode.DRIVING &&
+             google.maps.DirectionsStatus &&
+             google.maps.DirectionsStatus.OK
+    }
+
     // Directions functionality with retry mechanism
     const showDirections = (destinationLat, destinationLng, destinationName) => {
       console.log('Getting directions to:', destinationName, destinationLat, destinationLng)
 
-      // Check if Google Maps API is loaded
-      if (typeof google === 'undefined' || !google.maps || !google.maps.DirectionsService) {
-        alert('Google Maps API is not loaded yet. Please wait a moment and try again.')
+      try {
+        // Check if Google Maps API is loaded
+        if (!isGoogleMapsReady()) {
+          console.warn('Google Maps API not ready, attempting to wait...')
+          setTimeout(() => {
+            showDirections(destinationLat, destinationLng, destinationName)
+          }, 1000)
+          return
+        }
+
+        if (!directionsService.value || !directionsRenderer.value) {
+          console.warn('Directions service not available, attempting to reinitialize...')
+          setTimeout(() => {
+            showDirections(destinationLat, destinationLng, destinationName)
+          }, 1000)
+          return
+        }
+
+        // Clear existing directions safely
+        try {
+          directionsRenderer.value.setDirections({ routes: [] })
+        } catch (error) {
+          console.warn('Error clearing directions:', error)
+        }
+      } catch (error) {
+        console.error('Error in showDirections:', error)
+        alert('An error occurred while preparing directions. Please try again.')
         return
       }
-
-      if (!directionsService.value || !directionsRenderer.value) {
-        alert('Directions service not available')
-        return
-      }
-
-      // Clear existing directions
-      directionsRenderer.value.setDirections({ routes: [] })
 
       // Check if we have current location, if not try to get it first
       if (!currentLocation.value) {
@@ -438,69 +465,67 @@ export default {
     const calculateDirectionsWithRetry = (origin, destinationLat, destinationLng, destinationName, retryCount = 0) => {
       const maxRetries = 3
 
-      // Ensure Google Maps API is loaded
-      if (typeof google === 'undefined' || !google.maps) {
+      // Ensure Google Maps API is fully loaded
+      if (!isGoogleMapsReady()) {
         if (retryCount < maxRetries) {
-          console.log(`Retrying directions request (${retryCount + 1}/${maxRetries})...`)
+          console.log(`Google Maps API not ready, retrying (${retryCount + 1}/${maxRetries})...`)
           setTimeout(() => {
             calculateDirectionsWithRetry(origin, destinationLat, destinationLng, destinationName, retryCount + 1)
           }, 1000)
           return
         } else {
-          alert('Google Maps API is not loaded yet. Please wait a moment and try again.')
-          return
-        }
-      }
-
-      // Check if TravelMode is available
-      if (!google.maps.TravelMode) {
-        if (retryCount < maxRetries) {
-          console.log(`TravelMode not available, retrying (${retryCount + 1}/${maxRetries})...`)
-          setTimeout(() => {
-            calculateDirectionsWithRetry(origin, destinationLat, destinationLng, destinationName, retryCount + 1)
-          }, 1000)
-          return
-        } else {
-          console.error('Google Maps TravelMode not available after retries')
+          console.error('Google Maps API not ready after retries')
           alert('Google Maps API is not fully loaded. Please wait a moment and try again.')
           return
         }
       }
 
-      const request = {
-        origin: origin,
-        destination: { lat: destinationLat, lng: destinationLng },
-        travelMode: google.maps.TravelMode.DRIVING,
-        unitSystem: google.maps.UnitSystem.METRIC,
-        avoidHighways: false,
-        avoidTolls: false
-      }
-
-      directionsService.value.route(request, (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK) {
-          directionsRenderer.value.setDirections(result)
-
-          // Center map on the route
-          const bounds = new google.maps.LatLngBounds()
-          result.routes[0].overview_path.forEach(point => {
-            bounds.extend(point)
-          })
-          map.value.fitBounds(bounds)
-
-          console.log('Directions displayed successfully')
-
-          // Show success message with route info
-          const route = result.routes[0]
-          const leg = route.legs[0]
-          const distance = leg.distance.text
-          const duration = leg.duration.text
-
-          alert(`Directions to ${destinationName} displayed!\nDistance: ${distance}\nDuration: ${duration}`)
-        } else {
-          console.error('Directions request failed:', status)
-          alert(`Failed to get directions. Status: ${status}`)
+      try {
+        const request = {
+          origin: origin,
+          destination: { lat: destinationLat, lng: destinationLng },
+          travelMode: google.maps.TravelMode.DRIVING,
+          unitSystem: google.maps.UnitSystem.METRIC,
+          avoidHighways: false,
+          avoidTolls: false
         }
-      })
+
+        console.log('Sending directions request:', request)
+
+        directionsService.value.route(request, (result, status) => {
+          try {
+            if (status === google.maps.DirectionsStatus.OK) {
+              directionsRenderer.value.setDirections(result)
+
+              // Center map on the route
+              const bounds = new google.maps.LatLngBounds()
+              result.routes[0].overview_path.forEach(point => {
+                bounds.extend(point)
+              })
+              map.value.fitBounds(bounds)
+
+              console.log('Directions displayed successfully')
+
+              // Show success message with route info
+              const route = result.routes[0]
+              const leg = route.legs[0]
+              const distance = leg.distance.text
+              const duration = leg.duration.text
+
+              alert(`Directions to ${destinationName} displayed!\nDistance: ${distance}\nDuration: ${duration}`)
+            } else {
+              console.error('Directions request failed:', status)
+              alert(`Failed to get directions. Status: ${status}`)
+            }
+          } catch (callbackError) {
+            console.error('Error in directions callback:', callbackError)
+            alert('An error occurred while processing directions. Please try again.')
+          }
+        })
+      } catch (requestError) {
+        console.error('Error creating directions request:', requestError)
+        alert('An error occurred while creating directions request. Please try again.')
+      }
     }
 
     // Clear directions
@@ -560,7 +585,7 @@ export default {
 
       // Load Google Maps API script
       const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_CONFIG.apiKey}&libraries=places,geometry&callback=initGoogleMaps`
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_CONFIG.apiKey}&libraries=places,geometry&callback=initGoogleMaps&v=weekly`
       script.async = true
       script.defer = true
 
