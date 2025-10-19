@@ -42,12 +42,15 @@ exports.sendEmail = onRequest((req, res) => {
       return res.status(400).json({ error: 'Missing required fields: to, subject, message' });
     }
 
+    // Check if message contains HTML tags
+    const isHtml = message.includes('<html>') || message.includes('<div>') || message.includes('<p>');
+
     const msg = {
       to,
       from: 'jinggao1212@gmail.com',
       subject,
-      text: message,
-      html: `<p>${message}</p>`
+      text: isHtml ? message.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : message,
+      html: isHtml ? message : `<p>${message}</p>`
     };
 
     sgMail.send(msg)

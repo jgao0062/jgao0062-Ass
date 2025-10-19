@@ -581,7 +581,7 @@ export async function userHasJoinedProgram(userId, programId) {
   try {
     const userIdStr = String(userId)
     const programIdStr = String(programId)
-    
+
     const q = query(
       collection(db, ACTIVITIES_COLLECTION),
       where('userId', '==', userIdStr),
@@ -611,10 +611,10 @@ export async function addRating(programId, userId, value) {
   try {
     // Debug logging
     console.log('addRating called with:', { programId, userId, value })
-    
+
     // Validate rating value
     const ratingValue = Math.max(1, Math.min(5, Number(value)))
-    
+
     // Ensure programId is string for Firebase consistency
     const programIdStr = String(programId)
     const userIdStr = String(userId)
@@ -706,7 +706,7 @@ export async function getUserActivities(userId) {
   try {
     // Ensure userId is string for Firebase consistency
     const userIdStr = String(userId)
-    
+
     // Simple query without orderBy to avoid index issues
     const q = query(
       collection(db, ACTIVITIES_COLLECTION),
@@ -754,11 +754,11 @@ export async function getUserActivities(userId) {
  */
 export async function addUserActivity(userId, programId, programName) {
   try {
-    
+
     // Ensure IDs are strings for Firebase consistency
     const userIdStr = String(userId)
     const programIdStr = String(programId)
-    
+
     // Check if user already joined this program
     const q = query(
       collection(db, ACTIVITIES_COLLECTION),
@@ -799,23 +799,40 @@ export async function addUserActivity(userId, programId, programName) {
     try {
       // Get user profile data for email
       const userProfileResult = await getUserProfileFromFirebase(userIdStr)
-      
+
       if (userProfileResult.success) {
         const userData = userProfileResult.data
-        
+
         // Get program details for email
-        const programDocRef = doc(db, PROGRAMS_COLLECTION, programIdStr)
-        const programDoc = await getDoc(programDocRef)
-        
+        // First try to find the program by its id field (not document ID)
+        const programsQuery = query(
+          collection(db, PROGRAMS_COLLECTION),
+          where('id', '==', programIdStr)
+        )
+        const programsSnapshot = await getDocs(programsQuery)
+
+        let programDoc = null
+        if (!programsSnapshot.empty) {
+          // Use the first matching document
+          programDoc = programsSnapshot.docs[0]
+        }
+
         // Create program data (use provided programName if document doesn't exist)
         const programData = {
           id: programIdStr,
-          name: programDoc.exists() ? (programDoc.data().name || programName) : programName,
-          description: programDoc.exists() ? (programDoc.data().description || '') : '',
-          schedule: programDoc.exists() ? (programDoc.data().schedule || '') : '',
-          location: programDoc.exists() ? (programDoc.data().location || '') : ''
+          name: programDoc ? (programDoc.data().name || programName) : programName,
+          description: programDoc ? (programDoc.data().description || null) : null,
+          schedule: programDoc ? (programDoc.data().schedule || null) : null,
+          location: programDoc ? (programDoc.data().location || null) : null
         }
-        
+
+        // Log program data for debugging
+        securityLog('info', 'Program data for email', {
+          programId: programIdStr,
+          programFound: !!programDoc,
+          programData: programData
+        })
+
         // Send email (don't wait for it to complete)
         sendProgramJoinEmail(userData, programData).then(emailResult => {
           if (emailResult.success) {
@@ -881,7 +898,7 @@ export async function removeUserActivity(userId, programId) {
     // Ensure IDs are strings for Firebase consistency
     const userIdStr = String(userId)
     const programIdStr = String(programId)
-    
+
     const q = query(
       collection(db, ACTIVITIES_COLLECTION),
       where('userId', '==', userIdStr),
@@ -937,7 +954,7 @@ export async function hasUserJoinedProgram(userId, programId) {
     // Ensure IDs are strings for Firebase consistency
     const userIdStr = String(userId)
     const programIdStr = String(programId)
-    
+
     const q = query(
       collection(db, ACTIVITIES_COLLECTION),
       where('userId', '==', userIdStr),
@@ -1009,10 +1026,10 @@ export async function getAllPrograms() {
       collection(db, PROGRAMS_COLLECTION),
       orderBy('id', 'asc')
     )
-    
+
     const querySnapshot = await getDocs(q)
     const programs = []
-    
+
     querySnapshot.forEach((doc) => {
       programs.push({
         id: doc.id,
@@ -1116,9 +1133,9 @@ export async function updateProgram(programId, programData) {
       collection(db, PROGRAMS_COLLECTION),
       where('id', '==', programId)
     )
-    
+
     const querySnapshot = await getDocs(q)
-    
+
     if (querySnapshot.empty) {
       return {
         success: false,
@@ -1174,9 +1191,9 @@ export async function deleteProgram(programId) {
       collection(db, PROGRAMS_COLLECTION),
       where('id', '==', programId)
     )
-    
+
     const querySnapshot = await getDocs(q)
-    
+
     if (querySnapshot.empty) {
       return {
         success: false,
@@ -1253,10 +1270,10 @@ export async function reorderProgramIds() {
       collection(db, PROGRAMS_COLLECTION),
       orderBy('id', 'asc')
     )
-    
+
     const querySnapshot = await getDocs(q)
     const programs = []
-    
+
     querySnapshot.forEach((doc) => {
       programs.push({
         docId: doc.id,
@@ -1295,14 +1312,14 @@ export async function reorderProgramIds() {
 
         // Update related ratings and activities with new programId
         const oldProgramId = programs[i].id
-        
+
         // Update ratings
         const ratingsQuery = query(
           collection(db, RATINGS_COLLECTION),
           where('programId', '==', oldProgramId)
         )
         const ratingsSnapshot = await getDocs(ratingsQuery)
-        const ratingUpdatePromises = ratingsSnapshot.docs.map(doc => 
+        const ratingUpdatePromises = ratingsSnapshot.docs.map(doc =>
           updateDoc(doc.ref, { programId: newId })
         )
         updatePromises.push(...ratingUpdatePromises)
@@ -1313,7 +1330,7 @@ export async function reorderProgramIds() {
           where('programId', '==', oldProgramId)
         )
         const activitiesSnapshot = await getDocs(activitiesQuery)
-        const activityUpdatePromises = activitiesSnapshot.docs.map(doc => 
+        const activityUpdatePromises = activitiesSnapshot.docs.map(doc =>
           updateDoc(doc.ref, { programId: newId })
         )
         updatePromises.push(...activityUpdatePromises)
@@ -1355,9 +1372,9 @@ export async function getProgramById(programId) {
       collection(db, PROGRAMS_COLLECTION),
       where('id', '==', programId)
     )
-    
+
     const querySnapshot = await getDocs(q)
-    
+
     if (querySnapshot.empty) {
       return {
         success: false,
